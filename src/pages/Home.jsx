@@ -62,6 +62,19 @@ function Home({ onSelectCategory }) {
     }
   ];
 
+  if (loading) {
+    return (
+      <div className="home-container" style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '400px'
+      }}>
+        <p style={{ color: '#999', fontSize: '16px' }}>Loading...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="home-container">
       <div className="home-header">
@@ -70,7 +83,7 @@ function Home({ onSelectCategory }) {
       </div>
 
       <div className="categories-grid">
-        {categories. map((cat) => (
+        {categories.map((cat) => (
           <div
             key={cat.id}
             className="category-card"

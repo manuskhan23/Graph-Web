@@ -36,10 +36,14 @@ function App() {
       setUser(authUser);
       setLoading(false);
       
-      if (authUser && (currentPage === 'login' || currentPage === 'signup')) {
+      // Only navigate if user just logged in/out
+      if (authUser) {
+        // User logged in, navigate to home
         setCurrentPage('home');
-      } else if (!authUser && currentPage !== 'login' && currentPage !== 'signup') {
-        setCurrentPage('login');
+      } else {
+        // User logged out, check if survey is completed
+        const surveyDone = localStorage.getItem('surveyCompleted') === 'true';
+        setCurrentPage(surveyDone ? 'login' : 'survey');
       }
     });
 
@@ -167,6 +171,16 @@ function App() {
 
         {user && currentPage === 'admin-manager' && (
           <AdminManager onBack={() => setCurrentPage('home')} />
+        )}
+
+        {user && !['home', 'ai-chat', 'category', 'survey-graph', 'admin-dashboard', 'admin-manager'].includes(currentPage) && (
+          <div style={{
+            padding: '40px 20px',
+            textAlign: 'center',
+            color: '#999'
+          }}>
+            <p>Loading...</p>
+          </div>
         )}
       </main>
 

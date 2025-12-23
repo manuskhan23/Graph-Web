@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ref, onValue, remove } from 'firebase/database';
 import { surveyDatabase } from './surveyFirebase';
+import { getCurrentUser } from '../src/firebase';
 import AdminManager from './adminManager';
 import './admin.css';
 
@@ -10,11 +11,16 @@ function AdminDashboard({ onBack }) {
   const [view, setView] = useState('dashboard'); // dashboard, responses, export
   const [searchTerm, setSearchTerm] = useState('');
   const [deletingId, setDeletingId] = useState(null);
+  const [currentUserRole, setCurrentUserRole] = useState(null);
+
+  const mainAdminEmail = 'anus2580@gmail.com';
+  const currentUser = getCurrentUser();
 
   useEffect(() => {
     const surveysRef = ref(surveyDatabase, 'surveys');
+    const adminsRef = ref(surveyDatabase, 'admins');
 
-    const unsubscribe = onValue(surveysRef, (snapshot) => {
+    const unsubscribeSurveys = onValue(surveysRef, (snapshot) => {
       const data = [];
       snapshot.forEach((childSnapshot) => {
         data.push({
@@ -29,7 +35,33 @@ function AdminDashboard({ onBack }) {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    const unsubscribeAdmins = onValue(adminsRef, (snapshot) => {
+      const adminsData = [];
+      snapshot.forEach((childSnapshot) => {
+        adminsData.push({
+          id: childSnapshot.key,
+          ...childSnapshot.val()
+        });
+      });
+
+      // Determine current user's role
+      if (currentUser) {
+        const userEmail = currentUser.email.toLowerCase();
+        if (userEmail === mainAdminEmail.toLowerCase()) {
+          setCurrentUserRole('main');
+        } else {
+          const userAdmin = adminsData.find(a => a.email.toLowerCase() === userEmail);
+          setCurrentUserRole(userAdmin?.role || 'added');
+        }
+      }
+    }, (error) => {
+      console.error('Error loading admins:', error);
+    });
+
+    return () => {
+      unsubscribeSurveys();
+      unsubscribeAdmins();
+    };
   }, []);
 
   const handleDeleteResponse = async (id) => {
@@ -147,12 +179,14 @@ function AdminDashboard({ onBack }) {
         >
           Responses ({surveys.length})
         </button>
-        <button
-          className={`admin-nav-btn ${view === 'manage-admins' ? 'active' : ''}`}
-          onClick={() => setView('manage-admins')}
-        >
-          👥 Manage Admins
-        </button>
+        {(currentUserRole === 'main' || currentUserRole === 'second') && (
+          <button
+            className={`admin-nav-btn ${view === 'manage-admins' ? 'active' : ''}`}
+            onClick={() => setView('manage-admins')}
+          >
+            👥 Manage Admins
+          </button>
+        )}
       </div>
 
       {/* Dashboard View */}

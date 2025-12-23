@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { logout, getCurrentUser } from '../firebase';
-import { getDatabase, ref, onValue } from 'firebase/database';
 
 function Navbar({ onLogout, onPageChange, currentPage }) {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -12,10 +11,10 @@ function Navbar({ onLogout, onPageChange, currentPage }) {
       const user = getCurrentUser();
       if (!user) return;
 
-      const userEmail = user.email;
+      const userEmail = user.email.toLowerCase();
 
       // Check if main admin
-      if (userEmail === mainAdminEmail) {
+      if (userEmail === mainAdminEmail.toLowerCase()) {
         setIsMainAdmin(true);
         setIsAdmin(true);
         return;
@@ -23,24 +22,39 @@ function Navbar({ onLogout, onPageChange, currentPage }) {
 
       // Check if in added admins list
       try {
-        const surveyDb = getDatabase();
-        const adminsRef = ref(surveyDb, 'admins');
+        // Dynamically import surveyDatabase to avoid circular dependency
+        const { surveyDatabase } = await import('../../survey/surveyFirebase');
+        const { ref, onValue } = await import('firebase/database');
 
-        onValue(adminsRef, (snapshot) => {
+        const adminsRef = ref(surveyDatabase, 'admins');
+
+        const unsubscribe = onValue(adminsRef, (snapshot) => {
           const admins = [];
           snapshot.forEach((childSnapshot) => {
-            admins.push(childSnapshot.val().email);
+            const adminEmail = childSnapshot.val().email.toLowerCase();
+            admins.push(adminEmail);
           });
 
           if (admins.includes(userEmail)) {
             setIsAdmin(true);
           }
-        }, { onlyOnce: true });
+        }, (error) => {
+          console.error('Error checking admin status:', error);
+        });
+
+        // Cleanup subscription
+        return () => unsubscribe();
       } catch (error) {
         console.error('Error checking admin status:', error);
       }
     };
-    checkAdmin();
+    
+    const cleanup = checkAdmin();
+    return () => {
+      if (cleanup && typeof cleanup === 'function') {
+        cleanup();
+      }
+    };
   }, []);
 
   const handleLogout = async () => {
@@ -83,14 +97,12 @@ function Navbar({ onLogout, onPageChange, currentPage }) {
             >
               ⚙️ Admin Dashboard
             </button>
-            {isMainAdmin && (
-              <button
-                className={currentPage === 'admin-manager' ? 'nav-btn active' : 'nav-btn'}
-                onClick={() => onPageChange('admin-manager')}
-              >
-                👥 Manage Admins
-              </button>
-            )}
+            <button
+              className={currentPage === 'admin-manager' ? 'nav-btn active' : 'nav-btn'}
+              onClick={() => onPageChange('admin-manager')}
+            >
+              👥 Manage Admins
+            </button>
           </>
         )}
         <button onClick={handleLogout} className="logout-btn">

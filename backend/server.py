@@ -8,7 +8,15 @@ import requests
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:5173", "http://localhost:3000", "*"])
+
+# Configure CORS for both local development and production
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+CORS(app, origins=[
+    "http://localhost:5173",
+    "http://localhost:3000",
+    FRONTEND_URL,
+    "*"
+])
 
 print("\n[●] Starting MyGraph AI Backend Server")
 print("=" * 50)

@@ -145,59 +145,41 @@ button[type="submit"]:disabled {
 
 /* ==================== NAVBAR ==================== */
 .navbar {
-  background-color: #667eea;
-  color: white;
-  padding: 15px 30px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 .navbar-brand {
-  font-size: 24px;
-  font-weight: bold;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
-.navbar-links {
-  display: flex;
-  gap: 15px;
-  align-items: center;
-}
-
-.nav-btn {
-  background: none;
-  border: none;
-  color: white;
-  cursor: pointer;
-  font-size: 14px;
+.nav-link {
+  color: white !important;
   font-weight: 500;
-  padding: 8px 12px;
+  font-size: 14px;
+  padding: 8px 12px !important;
   border-radius: 5px;
-  transition: background-color 0.3s;
+  transition: all 0.3s ease;
 }
 
-.nav-btn:hover {
+.nav-link:hover {
   background-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
 }
 
-.nav-btn.active {
+.nav-link.active {
   background-color: rgba(255, 255, 255, 0.3);
-}
-
-.logout-btn {
-  background-color: #ff6b6b;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 5px;
-  cursor: pointer;
   font-weight: 600;
-  transition: background-color 0.3s;
 }
 
-.logout-btn:hover {
-  background-color: #ff5252;
+.navbar-toggler {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.navbar-toggler:focus {
+  box-shadow: 0 0 0 0.25rem rgba(255, 255, 255, 0.25);
 }
 
 /* ==================== HOME PAGE ==================== */
@@ -719,33 +701,63 @@ button[type="submit"]:disabled {
 }
 
 /* ==================== RESPONSIVE ==================== */
-@media (max-width: 768px) {
-  .navbar {
-    flex-direction: column;
-    gap: 15px;
+
+/* Use Bootstrap breakpoints with custom overrides */
+@media (max-width: 1200px) {
+  .home-container,
+  .category-page-container,
+  .form-container,
+  .view-graph-container {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 992px) {
+  .home-container {
+    padding: 15px;
   }
 
-  .navbar-links {
-    width: 100%;
-    justify-content: center;
+  .categories-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .graph-display,
+  .preview-section .graph-display {
+    height: 350px;
+  }
+}
+
+@media (max-width: 768px) {
+  .home-container,
+  .category-page-container,
+  .form-container,
+  .view-graph-container {
+    padding: 12px;
   }
 
   .auth-box {
-    margin: 20px;
+    padding: 25px 15px;
+    max-width: 95%;
   }
 
-  .home-container {
-    padding: 20px;
+  .auth-box h1 {
+    font-size: 22px;
+  }
+
+  .auth-box h2 {
+    font-size: 18px;
   }
 
   .categories-grid {
     grid-template-columns: 1fr;
   }
 
-  .category-page-container,
-  .form-container,
-  .view-graph-container {
+  .category-card {
     padding: 15px;
+  }
+
+  .home-header h1 {
+    font-size: 24px;
   }
 
   .form-buttons {
@@ -754,12 +766,11 @@ button[type="submit"]:disabled {
 
   .graph-item-card {
     flex-direction: column;
-    align-items: flex-start;
   }
 
   .graph-item-actions {
     width: 100%;
-    justify-content: space-between;
+    flex-wrap: wrap;
   }
 
   .view-btn,
@@ -767,30 +778,134 @@ button[type="submit"]:disabled {
   .delete-btn {
     flex: 1;
     min-width: 70px;
+    padding: 6px 10px;
+    font-size: 12px;
   }
 
-  .home-header h1 {
-    font-size: 24px;
-  }
-
-  .graph-display {
+  .graph-display,
+  .preview-section .graph-display {
     height: 300px;
   }
 
+  .preview-section-inline .graph-card > div {
+    height: 250px;
+  }
+
   .footer {
-    padding: 30px 15px 15px 15px;
+    padding: 25px 15px 15px 15px;
   }
 
   .footer-content {
-    gap: 20px;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 576px) {
+  .home-container,
+  .category-page-container,
+  .form-container,
+  .view-graph-container {
+    padding: 10px;
+  }
+
+  .navbar-brand {
+    font-size: 18px;
+  }
+
+  .nav-link {
+    font-size: 13px;
+    padding: 6px 8px !important;
+  }
+
+  .auth-box {
+    padding: 20px 12px;
+    margin: 10px 5px;
+  }
+
+  .auth-box h1 {
+    font-size: 20px;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    font-size: 13px;
+  }
+
+  button[type="submit"] {
+    font-size: 13px;
+    padding: 10px;
+  }
+
+  .home-header h1 {
+    font-size: 20px;
+  }
+
+  .home-header p {
+    font-size: 13px;
+  }
+
+  .category-card {
+    padding: 12px;
+  }
+
+  .category-card h3 {
+    font-size: 18px;
+  }
+
+  .explore-btn {
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+
+  .form-section {
+    padding: 12px;
+  }
+
+  .graph-display,
+  .preview-section .graph-display {
+    height: 250px;
+    padding: 10px;
+  }
+
+  .preview-section-inline .graph-card > div {
+    height: 200px;
+  }
+
+  .view-btn,
+  .edit-btn,
+  .delete-btn {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+
+  .preview-btn,
+  .save-btn {
+    font-size: 12px;
+    padding: 8px;
+  }
+
+  .footer {
+    padding: 20px 10px;
+  }
+
+  .footer-content {
+    grid-template-columns: 1fr;
+    gap: 15px;
   }
 
   .footer-section h4 {
-    font-size: 16px;
+    font-size: 14px;
   }
 
-  .social-links {
-    justify-content: center;
+  .footer-section p,
+  .footer-section ul li a {
+    font-size: 12px;
+  }
+
+  .social-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
   }
 }

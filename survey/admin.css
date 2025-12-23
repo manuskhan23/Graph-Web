@@ -132,9 +132,38 @@
 }
 
 .admin-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  margin-top: 30px;
+}
+
+.charts-container {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
   gap: 30px;
+}
+
+.chart-section {
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-section h3 {
+  color: #333;
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.chart-section > div:last-child {
+  flex: 1;
+  position: relative;
 }
 
 .breakdown-section {
@@ -414,31 +443,107 @@
   margin-bottom: 0;
 }
 
+/* Bootstrap responsive */
 @media (max-width: 768px) {
+  .admin-container {
+    padding: 10px;
+  }
+
   .admin-header {
     flex-direction: column;
-    gap: 15px;
+    gap: 12px;
     text-align: center;
+    padding: 12px 15px;
+    margin-bottom: 20px;
   }
 
   .admin-header h1 {
-    font-size: 22px;
+    font-size: 20px;
+    margin-bottom: 0;
+  }
+
+  .btn-back {
+    padding: 8px 16px;
+    font-size: 13px;
   }
 
   .admin-nav {
     flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px;
+  }
+
+  .admin-nav-btn {
+    padding: 8px 12px;
+    font-size: 11px;
+    flex: 1;
+    min-width: 70px;
   }
 
   .stats-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .stat-card {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .stat-icon {
+    font-size: 32px;
+    min-width: 50px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+  }
+
+  .stat-value {
+    font-size: 22px;
+  }
+
+  .admin-breakdown {
+    gap: 30px;
+  }
+
+  .charts-container {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-section {
+    height: 350px;
+  }
+
+  .breakdown-section {
+    padding: 15px;
+  }
+
+  .breakdown-section h3 {
+    font-size: 16px;
+    margin-bottom: 15px;
   }
 
   .breakdown-item {
     grid-template-columns: 80px 1fr 60px;
+    gap: 10px;
   }
 
   .breakdown-label {
     font-size: 12px;
+  }
+
+  .breakdown-count {
+    font-size: 11px;
+  }
+
+  .admin-responses {
+    padding: 15px;
+  }
+
+  .search-input {
+    padding: 10px 12px;
+    font-size: 13px;
   }
 
   .responses-table {
@@ -447,10 +552,234 @@
 
   .responses-table th,
   .responses-table td {
-    padding: 10px;
+    padding: 10px 8px;
+  }
+
+  .platform-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+  .btn-delete {
+    padding: 6px 12px;
+    font-size: 11px;
   }
 
   .export-options {
     grid-template-columns: 1fr;
+  }
+
+  .export-card {
+    padding: 20px 15px;
+  }
+
+  .export-icon {
+    font-size: 40px;
+  }
+
+  .btn-export {
+    font-size: 13px;
+  }
+}
+
+/* Small Mobile */
+@media (max-width: 480px) {
+  .admin-container {
+    padding: 8px;
+  }
+
+  .admin-header {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+    padding: 10px 12px;
+    margin-bottom: 15px;
+  }
+
+  .admin-header h1 {
+    font-size: 18px;
+    margin-bottom: 0;
+  }
+
+  .btn-back {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .admin-nav {
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px;
+  }
+
+  .admin-nav-btn {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  .admin-loading {
+    font-size: 16px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .stat-card {
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .stat-icon {
+    font-size: 28px;
+    min-width: auto;
+  }
+
+  .stat-content {
+    text-align: center;
+  }
+
+  .stat-label {
+    font-size: 10px;
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
+
+  .admin-breakdown {
+    gap: 20px;
+  }
+
+  .charts-container {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-section {
+    height: 300px;
+    padding: 15px;
+  }
+
+  .chart-section h3 {
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+
+  .breakdown-section {
+    padding: 12px;
+  }
+
+  .breakdown-section h3 {
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+
+  .breakdown-item {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .breakdown-label {
+    font-size: 11px;
+    text-align: center;
+  }
+
+  .breakdown-bar {
+    height: 20px;
+  }
+
+  .breakdown-count {
+    font-size: 10px;
+    text-align: center;
+  }
+
+  .admin-responses {
+    padding: 10px;
+  }
+
+  .responses-header {
+    margin-bottom: 15px;
+  }
+
+  .search-input {
+    padding: 10px;
+    font-size: 12px;
+  }
+
+  .responses-table-wrapper {
+    overflow-x: auto;
+  }
+
+  .responses-table {
+    font-size: 11px;
+    min-width: 100%;
+  }
+
+  .responses-table th,
+  .responses-table td {
+    padding: 8px 5px;
+  }
+
+  .responses-table th {
+    font-size: 10px;
+  }
+
+  .platform-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  .timestamp {
+    font-size: 10px;
+  }
+
+  .timestamp small {
+    margin-top: 2px;
+  }
+
+  .btn-delete {
+    padding: 5px 10px;
+    font-size: 10px;
+  }
+
+  .export-options {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .export-card {
+    padding: 15px 12px;
+  }
+
+  .export-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+  }
+
+  .export-card h3 {
+    font-size: 14px;
+  }
+
+  .export-card p {
+    font-size: 12px;
+  }
+
+  .btn-export {
+    font-size: 12px;
+    padding: 10px;
+  }
+
+  .export-info {
+    padding: 12px;
+  }
+
+  .export-info p {
+    font-size: 12px;
+    margin: 8px 0;
   }
 }

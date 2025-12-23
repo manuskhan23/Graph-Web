@@ -366,39 +366,363 @@
   font-size: 14px;
 }
 
-@media (max-width: 600px) {
+/* Bootstrap responsive */
+@media (max-width: 768px) {
+  .admin-mgr-container {
+    padding: 10px;
+  }
+
   .admin-mgr-header {
     flex-direction: column;
-    gap: 15px;
+    gap: 12px;
     text-align: center;
+    padding: 12px 15px;
+    margin-bottom: 20px;
   }
 
   .admin-mgr-header h1 {
-    font-size: 22px;
+    font-size: 20px;
+    margin-bottom: 0;
+  }
+
+  .btn-back {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+
+  .message-alert {
+    padding: 12px 15px;
+    margin-bottom: 15px;
+    border-radius: 6px;
+  }
+
+  .admin-mgr-content {
+    max-width: 100%;
+    gap: 15px;
+  }
+
+  .section-card {
+    padding: 15px;
+    border-radius: 10px;
+  }
+
+  .section-card h2 {
+    font-size: 18px;
+    margin-bottom: 15px;
   }
 
   .section-header {
     flex-direction: column;
-    gap: 15px;
-    align-items: flex-start;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .section-header h2 {
+    margin: 0;
   }
 
   .btn-toggle-form {
     width: 100%;
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+
+  .section-desc {
+    font-size: 12px;
   }
 
   .admin-item {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .admin-item:hover {
+    border-color: #667eea;
+  }
+
+  .admin-email {
+    font-size: 14px;
+  }
+
+  .admin-meta {
+    font-size: 11px;
+  }
+
+  .admin-actions {
+    width: 100%;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .btn-promote,
+  .btn-demote,
+  .btn-remove {
+    flex: 1;
+    min-width: 60px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .add-admin-form {
+    padding: 15px;
+  }
+
+  .form-group {
+    margin-bottom: 12px;
+  }
+
+  .form-group label {
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+
+  .form-input {
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+
+  .form-info {
+    font-size: 12px;
+    padding: 12px;
+    margin: 15px 0;
+  }
+
+  .btn-submit {
+    padding: 10px 20px;
+    font-size: 13px;
+  }
+
+  .hierarchy-info {
+    display: flex;
+    flex-direction: column;
     gap: 15px;
+  }
+
+  .hierarchy-level {
+    padding: 12px;
+  }
+
+  .hierarchy-level h4 {
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
+
+  .hierarchy-level ul {
+    font-size: 12px;
+  }
+
+  .hierarchy-level li {
+    margin-bottom: 6px;
+  }
+}
+
+/* Small Mobile */
+@media (max-width: 480px) {
+  .admin-mgr-container {
+    padding: 8px;
+  }
+
+  .admin-mgr-header {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+    padding: 10px 12px;
+    margin-bottom: 15px;
+  }
+
+  .admin-mgr-header h1 {
+    font-size: 18px;
+    margin-bottom: 0;
+  }
+
+  .btn-back {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .admin-mgr-loading {
+    font-size: 16px;
+  }
+
+  .message-alert {
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    border-radius: 5px;
+  }
+
+  .admin-mgr-content {
+    max-width: 100%;
+    gap: 12px;
+  }
+
+  .section-card {
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .section-card h2 {
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+
+  .section-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .section-header h2 {
+    font-size: 15px;
+    margin: 0;
+  }
+
+  .btn-toggle-form {
+    width: 100%;
+    padding: 10px;
+    font-size: 12px;
+  }
+
+  .section-desc {
+    font-size: 11px;
+    margin-top: 8px;
+  }
+
+  .admin-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 6px;
+  }
+
+  .admin-item.main {
+    border-width: 1px;
+  }
+
+  .admin-email {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .admin-meta {
+    font-size: 10px;
+  }
+
+  .admin-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+    margin-top: 4px;
   }
 
   .admin-status {
     width: 100%;
-    justify-content: space-between;
   }
 
-  .btn-remove {
+  .status-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+  .admin-actions {
     width: 100%;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+
+  .btn-promote,
+  .btn-demote,
+  .btn-remove {
+    flex: 1;
+    min-width: 55px;
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+
+  .admins-list {
+    margin-top: 10px;
+  }
+
+  .no-admins {
+    padding: 30px 12px;
+    font-size: 12px;
+  }
+
+  .add-admin-form {
+    padding: 12px;
+    border-radius: 6px;
+  }
+
+  .form-group {
+    margin-bottom: 10px;
+  }
+
+  .form-group label {
+    font-size: 12px;
+    margin-bottom: 5px;
+    font-weight: 600;
+  }
+
+  .form-input {
+    font-size: 13px;
+    padding: 10px;
+    border-radius: 4px;
+  }
+
+  .form-info {
+    font-size: 11px;
+    padding: 10px;
+    margin: 12px 0;
+  }
+
+  .form-info p {
+    margin: 6px 0;
+  }
+
+  .btn-submit {
+    width: 100%;
+    padding: 10px;
+    font-size: 12px;
+    margin-top: 12px;
+  }
+
+  .info-card {
+    padding: 12px;
+    border-left: 3px solid #667eea;
+  }
+
+  .info-card h2 {
+    font-size: 15px;
+  }
+
+  .hierarchy-info {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .hierarchy-level {
+    padding: 10px;
+    background: #f9f9ff;
+    border-radius: 6px;
+  }
+
+  .hierarchy-level h4 {
+    font-size: 13px;
+    margin: 0 0 8px 0;
+  }
+
+  .hierarchy-level ul {
+    font-size: 11px;
+    padding-left: 15px;
+  }
+
+  .hierarchy-level li {
+    margin-bottom: 4px;
+    line-height: 1.4;
   }
 }

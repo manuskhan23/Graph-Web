@@ -50,8 +50,12 @@ function SurveyGraph({ onBack }) {
     };
 
     surveyData.forEach(response => {
-      // Platform statistics
-      if (response.platform) {
+      // Platform statistics - handle both array (platforms) and single (platform)
+      if (Array.isArray(response.platforms)) {
+        response.platforms.forEach(platform => {
+          platformStats[platform] = (platformStats[platform] || 0) + 1;
+        });
+      } else if (response.platform) {
         platformStats[response.platform] = (platformStats[response.platform] || 0) + 1;
       }
 
@@ -61,9 +65,12 @@ function SurveyGraph({ onBack }) {
       }
     });
 
-    // Convert to percentages
+    // Convert counts back to actual counts (not percentages) for accurate display
+    const platformCounts = { ...platformStats };
+    
+    // Convert to percentages for display
     Object.keys(platformStats).forEach(key => {
-      platformStats[key] = Math.round((platformStats[key] / totalResponses) * 100);
+      platformStats[key] = Math.round((platformStats[key] / surveyData.length) * 100);
     });
 
     Object.keys(timeSpentStats).forEach(key => {
@@ -73,46 +80,60 @@ function SurveyGraph({ onBack }) {
     return {
       totalResponses,
       platformStats,
-      timeSpentStats
+      timeSpentStats,
+      platformCounts
     };
   };
 
   const stats = calculateStatistics();
 
+  // Platform color mapping
+  const platformColors = {
+    youtube: '#FF0000',
+    instagram: '#E4405F',
+    facebook: '#1877F2',
+    linkedin: '#0A66C2',
+    tiktok: '#000000',
+    others: '#9C27B0'
+  };
+
   // Platform Distribution Chart Data
   const platformChartData = {
-    labels: Object.keys(stats.platformStats).map(p => p.charAt(0).toUpperCase() + p.slice(1)),
+    labels: Object.keys(stats.platformCounts).map(p => p.charAt(0).toUpperCase() + p.slice(1)),
     datasets: [{
-      label: 'Platform Usage (%)',
-      data: Object.values(stats.platformStats),
-      backgroundColor: [
-        '#FF6B6B',
-        '#4ECDC4',
-        '#45B7D1',
-        '#FFA07A',
-        '#98D8C8',
-        '#F7DC6F',
-        '#BB8FCE'
-      ],
+      label: 'Number of Users',
+      data: Object.values(stats.platformCounts),
+      backgroundColor: Object.keys(stats.platformCounts).map(
+        platform => platformColors[platform] || '#999'
+      ),
       borderColor: '#fff',
       borderWidth: 2
     }]
+  };
+
+  // Time Spent color mapping
+  const timeSpentColors = {
+    '2hrs': '#4CAF50',
+    '4hrs': '#8BC34A',
+    '6hrs': '#FFC107',
+    '8hrs': '#FF9800',
+    '8plus': '#F44336'
   };
 
   // Time Spent Chart Data
   const timeChartData = {
     labels: ['2 hrs', '4 hrs', '6 hrs', '8 hrs', '8+ hrs'],
     datasets: [{
-      label: 'Daily Time Spent (%)',
+      label: 'Number of Users',
       data: [
-        stats.timeSpentStats['2hrs'],
-        stats.timeSpentStats['4hrs'],
-        stats.timeSpentStats['6hrs'],
-        stats.timeSpentStats['8hrs'],
-        stats.timeSpentStats['8plus']
+        Math.round(stats.timeSpentStats['2hrs'] * stats.totalResponses / 100),
+        Math.round(stats.timeSpentStats['4hrs'] * stats.totalResponses / 100),
+        Math.round(stats.timeSpentStats['6hrs'] * stats.totalResponses / 100),
+        Math.round(stats.timeSpentStats['8hrs'] * stats.totalResponses / 100),
+        Math.round(stats.timeSpentStats['8plus'] * stats.totalResponses / 100)
       ],
-      backgroundColor: '#667eea',
-      borderColor: '#764ba2',
+      backgroundColor: ['#4CAF50', '#8BC34A', '#FFC107', '#FF9800', '#F44336'],
+      borderColor: '#fff',
       borderWidth: 2,
       borderRadius: 6
     }]
@@ -204,7 +225,7 @@ function SurveyGraph({ onBack }) {
               borderRadius: '8px',
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}>
-              <h3 style={{ color: '#333', marginBottom: '20px' }}>Social Media Platform Usage</h3>
+              <h3 style={{ color: '#333', marginBottom: '20px' }}>Social Media Platform Usage ({chartType.toUpperCase()})</h3>
               {chartType === 'pie' && <Pie data={platformChartData} options={chartOptions} />}
               {chartType === 'bar' && <Bar data={platformChartData} options={chartOptions} />}
               {chartType === 'line' && <Line data={platformChartData} options={chartOptions} />}
@@ -217,7 +238,7 @@ function SurveyGraph({ onBack }) {
               borderRadius: '8px',
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}>
-              <h3 style={{ color: '#333', marginBottom: '20px' }}>Daily Time Spent on Social Media</h3>
+              <h3 style={{ color: '#333', marginBottom: '20px' }}>Daily Time Spent on Social Media ({chartType.toUpperCase()})</h3>
               {chartType === 'pie' && <Pie data={timeChartData} options={chartOptions} />}
               {chartType === 'bar' && <Bar data={timeChartData} options={chartOptions} />}
               {chartType === 'line' && <Line data={timeChartData} options={chartOptions} />}
@@ -234,20 +255,25 @@ function SurveyGraph({ onBack }) {
             <h3 style={{ color: '#333', marginBottom: '20px' }}>Detailed Statistics</h3>
             
             <div style={{ marginBottom: '30px' }}>
-              <h4 style={{ color: '#667eea', marginBottom: '15px' }}>Platform Usage Breakdown (%)</h4>
+              <h4 style={{ color: '#667eea', marginBottom: '15px' }}>Platform Usage Breakdown</h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px' }}>
-                {Object.entries(stats.platformStats).map(([platform, percentage]) => (
+                {Object.entries(stats.platformCounts).map(([platform, count]) => (
                   <div key={platform} style={{
-                    background: '#f5f5f5',
+                    background: platformColors[platform] || '#f5f5f5',
                     padding: '15px',
                     borderRadius: '6px',
-                    textAlign: 'center'
+                    textAlign: 'center',
+                    color: 'white',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                   }}>
-                    <p style={{ color: '#666', margin: '0 0 8px 0', fontSize: '14px' }}>
+                    <p style={{ color: 'rgba(255,255,255,0.9)', margin: '0 0 8px 0', fontSize: '14px' }}>
                       {platform.charAt(0).toUpperCase() + platform.slice(1)}
                     </p>
-                    <p style={{ color: '#667eea', margin: 0, fontSize: '24px', fontWeight: '700' }}>
-                      {percentage}%
+                    <p style={{ color: 'white', margin: 0, fontSize: '24px', fontWeight: '700' }}>
+                      {count}
+                    </p>
+                    <p style={{ color: 'rgba(255,255,255,0.8)', margin: '5px 0 0 0', fontSize: '12px' }}>
+                      {stats.platformStats[platform]}%
                     </p>
                   </div>
                 ))}
@@ -255,29 +281,38 @@ function SurveyGraph({ onBack }) {
             </div>
 
             <div>
-              <h4 style={{ color: '#667eea', marginBottom: '15px' }}>Daily Time Spent Breakdown (%)</h4>
+              <h4 style={{ color: '#667eea', marginBottom: '15px' }}>Daily Time Spent Breakdown</h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px' }}>
                 {[
-                  { label: '2 hours', value: stats.timeSpentStats['2hrs'] },
-                  { label: '4 hours', value: stats.timeSpentStats['4hrs'] },
-                  { label: '6 hours', value: stats.timeSpentStats['6hrs'] },
-                  { label: '8 hours', value: stats.timeSpentStats['8hrs'] },
-                  { label: '8+ hours', value: stats.timeSpentStats['8plus'] }
-                ].map(item => (
-                  <div key={item.label} style={{
-                    background: '#f5f5f5',
-                    padding: '15px',
-                    borderRadius: '6px',
-                    textAlign: 'center'
-                  }}>
-                    <p style={{ color: '#666', margin: '0 0 8px 0', fontSize: '14px' }}>
-                      {item.label}
-                    </p>
-                    <p style={{ color: '#667eea', margin: 0, fontSize: '24px', fontWeight: '700' }}>
-                      {item.value}%
-                    </p>
-                  </div>
-                ))}
+                  { label: '2 hours', key: '2hrs', value: stats.timeSpentStats['2hrs'] },
+                  { label: '4 hours', key: '4hrs', value: stats.timeSpentStats['4hrs'] },
+                  { label: '6 hours', key: '6hrs', value: stats.timeSpentStats['6hrs'] },
+                  { label: '8 hours', key: '8hrs', value: stats.timeSpentStats['8hrs'] },
+                  { label: '8+ hours', key: '8plus', value: stats.timeSpentStats['8plus'] }
+                ].map(item => {
+                  const count = Math.round(item.value * stats.totalResponses / 100);
+                  const color = timeSpentColors[item.key];
+                  return (
+                    <div key={item.label} style={{
+                      background: color,
+                      padding: '15px',
+                      borderRadius: '6px',
+                      textAlign: 'center',
+                      color: 'white',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    }}>
+                      <p style={{ color: 'rgba(255,255,255,0.9)', margin: '0 0 8px 0', fontSize: '14px' }}>
+                        {item.label}
+                      </p>
+                      <p style={{ color: 'white', margin: 0, fontSize: '24px', fontWeight: '700' }}>
+                        {count}
+                      </p>
+                      <p style={{ color: 'rgba(255,255,255,0.8)', margin: '5px 0 0 0', fontSize: '12px' }}>
+                        {item.value}%
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

@@ -77,22 +77,23 @@ function Home({ onSelectCategory }) {
 
   return (
     <div className="home-container">
-      <div className="home-header">
+      <div className="home-header mb-5">
         <h1>Welcome, {userData?.name || 'User'}!</h1>
         <p>Create and manage your graphs across different categories</p>
       </div>
 
-      <div className="categories-grid">
+      <div className="row g-3">
         {categories.map((cat) => (
-          <div
-            key={cat.id}
-            className="category-card"
-            style={{ borderTop: `4px solid ${cat.color}` }}
-            onClick={() => onSelectCategory(cat.id)}
-          >
-            <h3>{cat.name}</h3>
-            <p>{cat.description}</p>
-            <button className="explore-btn">Explore →</button>
+          <div key={cat.id} className="col-12 col-sm-6 col-lg-4">
+            <div
+              className="category-card h-100"
+              style={{ borderTop: `4px solid ${cat.color}` }}
+              onClick={() => onSelectCategory(cat.id)}
+            >
+              <h3>{cat.name}</h3>
+              <p>{cat.description}</p>
+              <button className="explore-btn">Explore →</button>
+            </div>
           </div>
         ))}
       </div>

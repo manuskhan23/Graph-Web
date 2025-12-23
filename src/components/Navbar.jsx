@@ -68,46 +68,59 @@ function Navbar({ onLogout, onPageChange, currentPage }) {
   };
 
   return (
-    <nav className="navbar">
-      <div className="navbar-brand">📊 MyGraph</div>
-      <div className="navbar-links">
-        <button
-          className={currentPage === 'home' ? 'nav-btn active' : 'nav-btn'}
-          onClick={() => onPageChange('home')}
-        >
-          Home
+    <nav className="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
+      <div className="container-fluid">
+        <a className="navbar-brand fw-bold fs-5" href="#">📊 MyGraph</a>
+        <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span className="navbar-toggler-icon"></span>
         </button>
-        <button
-          className={currentPage === 'ai-chat' ? 'nav-btn active' : 'nav-btn'}
-          onClick={() => onPageChange('ai-chat')}
-        >
-          AI Assistant
-        </button>
-        {isAdmin && (
-          <>
+        <div className="collapse navbar-collapse" id="navbarNav">
+          <div className="navbar-nav ms-auto gap-2">
             <button
-              className={currentPage === 'survey-graph' ? 'nav-btn active' : 'nav-btn'}
-              onClick={() => onPageChange('survey-graph')}
+              className={`nav-link ${currentPage === 'home' ? 'active' : ''}`}
+              onClick={() => onPageChange('home')}
             >
-              📊 Survey Graph
+              Home
             </button>
             <button
-              className={currentPage === 'admin-dashboard' ? 'nav-btn active' : 'nav-btn'}
-              onClick={() => onPageChange('admin-dashboard')}
+              className={`nav-link ${currentPage === 'ai-chat' ? 'active' : ''}`}
+              onClick={() => onPageChange('ai-chat')}
             >
-              ⚙️ Admin Dashboard
+              AI Assistant
             </button>
             <button
-              className={currentPage === 'admin-manager' ? 'nav-btn active' : 'nav-btn'}
-              onClick={() => onPageChange('admin-manager')}
+              className={`nav-link ${currentPage === 'survey-form' ? 'active' : ''}`}
+              onClick={() => onPageChange('survey-form')}
             >
-              👥 Manage Admins
+              📝 Survey Form
             </button>
-          </>
-        )}
-        <button onClick={handleLogout} className="logout-btn">
-          Logout
-        </button>
+            {isAdmin && (
+              <>
+                <button
+                  className={`nav-link ${currentPage === 'survey-graph' ? 'active' : ''}`}
+                  onClick={() => onPageChange('survey-graph')}
+                >
+                  📊 Survey Graph
+                </button>
+                <button
+                  className={`nav-link ${currentPage === 'admin-dashboard' ? 'active' : ''}`}
+                  onClick={() => onPageChange('admin-dashboard')}
+                >
+                  ⚙️ Admin Dashboard
+                </button>
+                <button
+                  className={`nav-link ${currentPage === 'admin-manager' ? 'active' : ''}`}
+                  onClick={() => onPageChange('admin-manager')}
+                >
+                  👥 Manage Admins
+                </button>
+              </>
+            )}
+            <button onClick={handleLogout} className="btn btn-danger btn-sm ms-2">
+              Logout
+            </button>
+          </div>
+        </div>
       </div>
     </nav>
   );

@@ -9,7 +9,7 @@ function SurveyForm({ onComplete }) {
     fatherName: '',
     class: '',
     section: '',
-    socialMedia: '',
+    socialMedia: [], // Changed to array for checkboxes
     socialMediaOther: '',
     timeSpent: '',
     timestamp: new Date().toISOString()
@@ -38,11 +38,24 @@ function SurveyForm({ onComplete }) {
 
   const handleSocialMedia = (e) => {
     const value = e.target.value;
-    setFormData(prev => ({
-      ...prev,
-      socialMedia: value,
-      socialMediaOther: value === 'more' || value === 'others' ? prev.socialMediaOther : ''
-    }));
+    const isChecked = e.target.checked;
+    
+    setFormData(prev => {
+      let newSocialMedia = [...prev.socialMedia];
+      
+      if (isChecked) {
+        newSocialMedia.push(value);
+      } else {
+        newSocialMedia = newSocialMedia.filter(item => item !== value);
+      }
+      
+      return {
+        ...prev,
+        socialMedia: newSocialMedia,
+        socialMediaOther: newSocialMedia.includes('others') ? prev.socialMediaOther : ''
+      };
+    });
+    
     if (errors.socialMedia) {
       setErrors(prev => ({
         ...prev,
@@ -79,8 +92,8 @@ function SurveyForm({ onComplete }) {
     if (!formData.fatherName.trim()) newErrors.fatherName = "Father's name is required";
     if (!formData.class.trim()) newErrors.class = 'Class is required';
     if (!formData.section.trim()) newErrors.section = 'Section is required';
-    if (!formData.socialMedia) newErrors.socialMedia = 'Select a social media platform';
-    if ((formData.socialMedia === 'more' || formData.socialMedia === 'others') && !formData.socialMediaOther.trim()) {
+    if (formData.socialMedia.length === 0) newErrors.socialMedia = 'Select at least one social media platform';
+    if (formData.socialMedia.includes('others') && !formData.socialMediaOther.trim()) {
       newErrors.socialMediaOther = 'Please specify';
     }
     if (!formData.timeSpent) newErrors.timeSpent = 'Select time spent';
@@ -94,9 +107,24 @@ function SurveyForm({ onComplete }) {
            formData.fatherName.trim() &&
            formData.class.trim() &&
            formData.section.trim() &&
-           formData.socialMedia &&
-           ((formData.socialMedia === 'more' || formData.socialMedia === 'others') ? formData.socialMediaOther.trim() : true) &&
+           formData.socialMedia.length > 0 &&
+           (formData.socialMedia.includes('others') ? formData.socialMediaOther.trim() : true) &&
            formData.timeSpent;
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      fatherName: '',
+      class: '',
+      section: '',
+      socialMedia: [],
+      socialMediaOther: '',
+      timeSpent: '',
+      timestamp: new Date().toISOString()
+    });
+    setErrors({});
+    setTouched({});
   };
 
   const handleSubmit = async (e) => {
@@ -114,7 +142,7 @@ function SurveyForm({ onComplete }) {
         fatherName: formData.fatherName,
         class: formData.class,
         section: formData.section,
-        platform: formData.socialMedia,
+        platforms: formData.socialMedia, // Array of selected platforms
         platformOther: formData.socialMediaOther,
         timeSpent: formData.timeSpent,
         timestamp: formData.timestamp
@@ -124,6 +152,9 @@ function SurveyForm({ onComplete }) {
       await submitSurvey(surveyData);
 
       showSuccessAlert('Success', 'Your survey has been submitted successfully!');
+      
+      // Reset form
+      resetForm();
       
       // Call onComplete callback to proceed to login
       if (onComplete) {
@@ -204,27 +235,26 @@ function SurveyForm({ onComplete }) {
             {errors.section && touched.section && <div className="invalid-feedback d-block">{errors.section}</div>}
           </div>
 
-          {/* Question 5: Social Media Platform - Radio Buttons */}
+          {/* Question 5: Social Media Platform - Checkboxes */}
           <div className="mb-4">
-            <label className="form-label fw-bold">Which social media platform do you use most? *</label>
-            <div className="radio-group">
+            <label className="form-label fw-bold">Which social media platforms do you use? * (Select all that apply)</label>
+            <div className="checkbox-group">
               {[
                 { id: 'youtube', value: 'youtube', label: 'YouTube' },
                 { id: 'instagram', value: 'instagram', label: 'Instagram' },
                 { id: 'facebook', value: 'facebook', label: 'Facebook' },
                 { id: 'linkedin', value: 'linkedin', label: 'LinkedIn' },
                 { id: 'tiktok', value: 'tiktok', label: 'TikTok' },
-                { id: 'more', value: 'more', label: 'More than one' },
                 { id: 'others', value: 'others', label: 'Others' }
               ].map(option => (
                 <div key={option.id} className="form-check">
                   <input
                     className="form-check-input"
-                    type="radio"
+                    type="checkbox"
                     id={option.id}
                     name="socialMedia"
                     value={option.value}
-                    checked={formData.socialMedia === option.value}
+                    checked={formData.socialMedia.includes(option.value)}
                     onChange={handleSocialMedia}
                   />
                   <label className="form-check-label" htmlFor={option.id}>
@@ -236,8 +266,8 @@ function SurveyForm({ onComplete }) {
             {errors.socialMedia && touched.socialMedia && <div className="text-danger small mt-2">{errors.socialMedia}</div>}
           </div>
 
-          {/* Conditional input for "more" or "others" */}
-          {(formData.socialMedia === 'more' || formData.socialMedia === 'others') && (
+          {/* Conditional input for "others" */}
+          {formData.socialMedia.includes('others') && (
             <div className="form-floating mb-3">
               <input
                 type="text"

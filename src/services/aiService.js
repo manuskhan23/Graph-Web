@@ -1,6 +1,6 @@
-const LOCAL_API_URL = 'http://localhost:5000/api';
+// Use environment variable or default to localhost
+const LOCAL_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_API_KEY = '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';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 // Try local backend first, fallback to Groq API
@@ -34,7 +34,6 @@ export async function sendMessage(message) {
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({

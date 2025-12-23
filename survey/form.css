@@ -215,37 +215,148 @@
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
-/* Responsive */
-@media (max-width: 600px) {
+/* Responsive - Bootstrap breakpoints */
+
+@media (max-width: 768px) {
+  .survey-container {
+    padding: 15px;
+  }
+
   .survey-form-wrapper {
-    padding: 25px;
+    max-width: 100%;
+    padding: 30px 20px;
+    margin: 10px;
+    border-radius: 10px;
   }
 
   .survey-title {
-    font-size: 22px;
+    font-size: 24px;
+    margin-bottom: 8px;
   }
 
   .survey-subtitle {
     font-size: 13px;
-    margin-bottom: 20px;
+    margin-bottom: 25px;
   }
 
   .form-floating > .form-control {
     padding-top: 1.5rem;
     padding-bottom: 0.5rem;
     font-size: 14px;
+    border-radius: 5px;
+  }
+
+  .form-check {
+    padding: 12px;
+    margin-bottom: 2px;
+  }
+
+  .form-check-label {
+    font-size: 13px;
+  }
+
+  .form-check-input {
+    width: 16px;
+    height: 16px;
+  }
+
+  .submit-btn {
+    padding: 11px 24px;
+    font-size: 14px;
+    margin-top: 15px;
+  }
+
+  .invalid-feedback {
+    font-size: 11px;
+  }
+}
+
+/* Small Mobile */
+@media (max-width: 480px) {
+  .survey-container {
+    padding: 10px;
+    min-height: 100vh;
+  }
+
+  .survey-form-wrapper {
+    padding: 20px 15px;
+    margin: 5px;
+    max-width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .survey-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 5px;
+  }
+
+  .survey-subtitle {
+    font-size: 12px;
+    margin-bottom: 20px;
+    line-height: 1.4;
+  }
+
+  .survey-form {
+    gap: 3px;
+  }
+
+  .form-floating > .form-control {
+    padding-top: 1.4rem;
+    padding-bottom: 0.4rem;
+    font-size: 13px;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 4px;
+  }
+
+  .form-floating > label {
+    font-size: 0.85rem;
   }
 
   .form-check {
     padding: 10px;
+    margin-bottom: 0;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+  }
+
+  .form-check-input {
+    width: 14px;
+    height: 14px;
+    margin-top: 0.25rem;
   }
 
   .form-check-label {
-    font-size: 14px;
+    font-size: 12px;
+    margin-left: 6px;
+  }
+
+  .radio-group {
+    gap: 8px;
+    margin-top: 10px;
   }
 
   .submit-btn {
     padding: 10px 20px;
-    font-size: 14px;
+    font-size: 13px;
+    margin-top: 15px;
+    border-radius: 5px;
+  }
+
+  .submit-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  }
+
+  .invalid-feedback {
+    font-size: 10px;
+    margin-top: 3px;
+  }
+
+  .error {
+    padding: 8px;
+    font-size: 12px;
+    margin: 8px 0;
   }
 }

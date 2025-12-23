@@ -156,6 +156,10 @@ function App() {
         {user && currentPage === 'ai-chat' && (
           <AIChat user={user} onBack={() => setCurrentPage('home')} />
         )}
+
+        {user && currentPage === 'survey-form' && (
+          <SurveyForm onBack={() => setCurrentPage('home')} />
+        )}
         
         {user && currentPage === 'category' && selectedCategory && (
           renderCategoryPage()
@@ -173,7 +177,7 @@ function App() {
           <AdminManager onBack={() => setCurrentPage('home')} />
         )}
 
-        {user && !['home', 'ai-chat', 'category', 'survey-graph', 'admin-dashboard', 'admin-manager'].includes(currentPage) && (
+        {user && !['home', 'ai-chat', 'survey-form', 'category', 'survey-graph', 'admin-dashboard', 'admin-manager'].includes(currentPage) && (
           <div style={{
             padding: '40px 20px',
             textAlign: 'center',

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getUserGraphs, saveGraphData, database, set, ref } from '../../firebase';
+import Swal from 'sweetalert2';
+import { getUserGraphs, saveGraphData, updateGraphData, database, set, ref } from '../../firebase';
 import { remove } from 'firebase/database';
 import Graph from '../../components/Graph';
 
@@ -28,7 +29,21 @@ function BusinessGraph({ user, onBack }) {
 
   useEffect(() => {
     fetchGraphs();
+    setViewGraphId(null);
+    setShowForm(false);
   }, [user]);
+
+  // Scroll to preview when it appears
+  useEffect(() => {
+    if (preview) {
+      setTimeout(() => {
+        const previewElement = document.getElementById('preview-section');
+        if (previewElement) {
+          previewElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  }, [preview]);
 
   const fetchGraphs = async () => {
     try {
@@ -123,8 +138,28 @@ function BusinessGraph({ user, onBack }) {
         throw new Error('No data to save');
       }
 
-      await saveGraphData(user.uid, 'business', reportName, graphData);
-      alert('✅ Business report saved!');
+      if (editGraphId) {
+        // Update existing graph
+        await updateGraphData(user.uid, 'business', editGraphId, reportName, graphData);
+        Swal.fire({
+          icon: 'success',
+          title: 'Updated!',
+          text: 'Business report updated successfully',
+          timer: 1500,
+          showConfirmButton: false
+        });
+        setEditGraphId(null);
+      } else {
+        // Save new graph
+        await saveGraphData(user.uid, 'business', reportName, graphData);
+        Swal.fire({
+          icon: 'success',
+          title: 'Saved!',
+          text: 'Business report saved successfully',
+          timer: 1500,
+          showConfirmButton: false
+        });
+      }
       
       setFormData([{ month: '', revenue: '' }]);
       setReportName('');
@@ -140,7 +175,18 @@ function BusinessGraph({ user, onBack }) {
   };
 
   const handleDelete = async (graphId) => {
-    if (!window.confirm('Delete this graph?')) return;
+    const result = await Swal.fire({
+      title: 'Delete Graph?',
+      text: 'This action cannot be undone',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete it!',
+      cancelButtonText: 'Cancel'
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
       await remove(ref(database, `graphs/${user.uid}/business/${graphId}`));
@@ -149,9 +195,19 @@ function BusinessGraph({ user, onBack }) {
         delete updated[graphId];
         return updated;
       });
-      alert('✅ Graph deleted!');
+      Swal.fire({
+        icon: 'success',
+        title: 'Deleted!',
+        text: 'Graph deleted successfully',
+        timer: 1500,
+        showConfirmButton: false
+      });
     } catch (err) {
-      alert('❌ Error: ' + err.message);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error!',
+        text: 'Failed to delete graph: ' + err.message
+      });
     }
   };
 
@@ -164,6 +220,8 @@ function BusinessGraph({ user, onBack }) {
       month: label,
       revenue: graphData.data[idx]
     })));
+    setPreview(null);  // Clear preview when starting edit
+    setError('');  // Clear any errors
     setShowForm(true);
   };
 
@@ -257,8 +315,9 @@ function BusinessGraph({ user, onBack }) {
           <div className="form-group">
             <label>Chart Type *</label>
             <select value={chartType} onChange={(e) => setChartType(e.target.value)}>
-              <option value="line">📈 Line Chart</option>
-              <option value="bar">📊 Bar Chart</option>
+              <option value="line">Line Chart</option>
+              <option value="bar">Bar Chart</option>
+              <option value="pie">Pie Chart</option>
             </select>
           </div>
 
@@ -309,7 +368,7 @@ function BusinessGraph({ user, onBack }) {
       )}
 
       {preview && (
-        <div className="preview-section">
+        <div className="preview-section" id="preview-section">
           <h2>📊 Preview</h2>
           <div className="graph-display">
             <Graph type={chartType} title={reportName} data={preview} />
@@ -317,38 +376,40 @@ function BusinessGraph({ user, onBack }) {
         </div>
       )}
 
-      <div className="graphs-list">
-        {loading ? (
-          <p style={{ textAlign: 'center' }}>Loading graphs...</p>
-        ) : graphCount === 0 ? (
-          <div className="no-graphs">
-            <p>📭 No business graphs yet!</p>
-          </div>
-        ) : (
-          Object.entries(graphs).map(([id, graph]) => (
-            <div key={id} className="graph-item-card">
-              <div className="graph-item-content">
-                <h3>{graph.name}</h3>
-                <p>📅 Created: {new Date(graph.createdAt).toLocaleDateString()}</p>
-                <p className="graph-type">Metric: {graph.metric || 'Revenue'}</p>
-              </div>
-              <div className="graph-item-actions">
-                <button className="preview-btn" onClick={() => handleViewGraph(id)}>
-                  👁️ Preview
-                </button>
-                <button className="edit-btn" onClick={() => handleEdit(id, graph)}>
-                  ✏️ Edit
-                </button>
-                <button className="delete-btn" onClick={() => handleDelete(id)}>
-                  🗑️ Delete
-                </button>
-              </div>
+      {!showForm && (
+        <div className="graphs-list">
+          {loading ? (
+            <p style={{ textAlign: 'center' }}>Loading graphs...</p>
+          ) : graphCount === 0 ? (
+            <div className="no-graphs">
+              <p>📭 No business graphs yet!</p>
             </div>
-          ))
-        )}
+          ) : (
+            Object.entries(graphs).map(([id, graph]) => (
+              <div key={id} className="graph-item-card">
+                <div className="graph-item-content">
+                  <h3>{graph.name}</h3>
+                  <p>📅 Created: {new Date(graph.createdAt).toLocaleDateString()}</p>
+                  <p className="graph-type">Metric: {graph.metric || 'Revenue'}</p>
+                </div>
+                <div className="graph-item-actions">
+                  <button className="preview-btn" onClick={() => handleViewGraph(id)}>
+                    👁️ Preview
+                  </button>
+                  <button className="edit-btn" onClick={() => handleEdit(id, graph)}>
+                    ✏️ Edit
+                  </button>
+                  <button className="delete-btn" onClick={() => handleDelete(id)}>
+                    🗑️ Delete
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
       </div>
-    </div>
-  );
-}
+      );
+      }
 
 export default BusinessGraph;

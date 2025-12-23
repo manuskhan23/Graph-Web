@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Swal from 'sweetalert2';
 import { getUserGraphs, saveGraphData, database } from '../../firebase';
 import { ref, remove } from 'firebase/database';
 import Graph from '../../components/Graph';
@@ -15,6 +16,7 @@ function EducationGraph({ user, onBack }) {
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [viewingGraphId, setViewingGraphId] = useState(null);
 
   useEffect(() => {
     fetchGraphs();
@@ -22,7 +24,7 @@ function EducationGraph({ user, onBack }) {
 
   const fetchGraphs = async () => {
     try {
-      const data = await getUserGraphs(user. uid, 'education');
+      const data = await getUserGraphs(user.uid, 'education');
       setGraphs(data || {});
     } catch (err) {
       console.error('Error fetching graphs:', err);
@@ -102,21 +104,27 @@ function EducationGraph({ user, onBack }) {
     try {
       const graphData = {
         labels: preview.labels,
-        datasets: preview.datasets,
+        data: preview.datasets,
         type: chartType
       };
 
       await saveGraphData(user.uid, 'education', reportName, graphData);
-      alert('[✓] Education report saved!');
-      
-      // Reset form
-      setFormData([{ name: '', firstResult: '', secondResult: '' }]);
-      setReportName('');
-      setPreview(null);
-      setShowForm(false);
-      
-      // Refresh graphs
-      fetchGraphs();
+       Swal.fire({
+         icon: 'success',
+         title: 'Saved!',
+         text: 'Education report saved successfully',
+         timer: 1500,
+         showConfirmButton: false
+       });
+       
+       // Reset form
+       setFormData([{ name: '', firstResult: '', secondResult: '' }]);
+       setReportName('');
+       setPreview(null);
+       setShowForm(false);
+       
+       // Refresh graphs
+       fetchGraphs();
     } catch (err) {
       setError(`[✗] Error: ${err.message}`);
     } finally {
@@ -125,7 +133,18 @@ function EducationGraph({ user, onBack }) {
   };
 
   const handleDelete = async (graphId) => {
-    if (!window.confirm('Delete this graph?')) return;
+    const result = await Swal.fire({
+      title: 'Delete Graph?',
+      text: 'This action cannot be undone',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete it!',
+      cancelButtonText: 'Cancel'
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
       await remove(ref(database, `graphs/${user.uid}/education/${graphId}`));
@@ -134,13 +153,35 @@ function EducationGraph({ user, onBack }) {
         delete updated[graphId];
         return updated;
       });
-      alert('[✓] Graph deleted!');
+      Swal.fire({
+        icon: 'success',
+        title: 'Deleted!',
+        text: 'Graph deleted successfully',
+        timer: 1500,
+        showConfirmButton: false
+      });
     } catch (err) {
-      alert('[✗] Error: ' + err.message);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error!',
+        text: 'Failed to delete graph: ' + err.message
+      });
     }
   };
 
   const graphCount = Object.keys(graphs).length;
+
+  // Scroll to preview when it appears
+  useEffect(() => {
+    if (preview) {
+      setTimeout(() => {
+        const previewElement = document.getElementById('preview-section');
+        if (previewElement) {
+          previewElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  }, [preview]);
 
   return (
     <div className="category-page-container">
@@ -230,7 +271,7 @@ function EducationGraph({ user, onBack }) {
 
       {/* Preview */}
       {preview && (
-        <div className="preview-section">
+        <div className="preview-section" id="preview-section">
           <h2>Preview</h2>
           <div className="graph-display">
             <Graph type={chartType} title={reportName} data={preview} />
@@ -238,32 +279,54 @@ function EducationGraph({ user, onBack }) {
         </div>
       )}
 
-      {/* Saved Graphs */}
-      <div className="graphs-list">
-        {loading ?  (
-          <p style={{ textAlign: 'center' }}>Loading graphs...</p>
-        ) : graphCount === 0 ? (
-          <div className="no-graphs">
-            <p>No education graphs yet. Create one to get started!</p>
-          </div>
-        ) : (
-          Object.entries(graphs).map(([id, graph]) => (
-            <div key={id} className="graph-item-card">
-              <div className="graph-item-content">
-                <h3>{graph.name}</h3>
-                <p>Created: {new Date(graph.createdAt).toLocaleDateString()}</p>
-              </div>
-              <div className="graph-item-actions">
-                <button className="delete-btn" onClick={() => handleDelete(id)}>
-                  Delete
-                </button>
-              </div>
+      {!showForm && (
+        <div className="graphs-list">
+          {loading ?  (
+            <p style={{ textAlign: 'center' }}>Loading graphs...</p>
+          ) : graphCount === 0 ? (
+            <div className="no-graphs">
+              <p>No education graphs yet. Create one to get started!</p>
             </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
+          ) : (
+            Object.entries(graphs).map(([id, graph]) => (
+              <div key={id} className="graph-item-card">
+                <div className="graph-item-content">
+                  <h3>{graph.name}</h3>
+                  <p>Created: {new Date(graph.createdAt).toLocaleDateString()}</p>
+                </div>
+                <div className="graph-item-actions">
+                  <button className="preview-btn" onClick={() => setViewingGraphId(id)}>
+                    Preview
+                  </button>
+                  <button className="delete-btn" onClick={() => handleDelete(id)}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
-export default EducationGraph;
+      {/* Graph Preview Modal */}
+      {viewingGraphId && graphs[viewingGraphId] && (
+        <div className="preview-section">
+          <div className="preview-header">
+            <h2>{graphs[viewingGraphId].name}</h2>
+            <button className="close-btn" onClick={() => setViewingGraphId(null)}>✕</button>
+          </div>
+          <Graph 
+            type={graphs[viewingGraphId].type} 
+            title={graphs[viewingGraphId].name} 
+            data={{
+              labels: graphs[viewingGraphId].labels,
+              datasets: graphs[viewingGraphId].data
+            }} 
+          />
+        </div>
+      )}
+      </div>
+      );
+      }
+
+      export default EducationGraph;

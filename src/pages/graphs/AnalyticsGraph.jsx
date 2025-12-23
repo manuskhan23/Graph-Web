@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getUserGraphs, saveGraphData, database } from '../../firebase';
+import { getUserGraphs, saveGraphData, updateGraphData, database } from '../../firebase';
 import { ref, remove } from 'firebase/database';
 import Graph from '../../components/Graph';
 
@@ -16,17 +16,35 @@ function AnalyticsGraph({ user, onBack }) {
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [viewGraphId, setViewGraphId] = useState(null);
+  const [editGraphId, setEditGraphId] = useState(null);
 
   const metrics = {
     traffic: '👥 Website Traffic',
     clicks: '🖱️ User Clicks',
-    conversions:  '✅ Conversions',
+    conversions: '✅ Conversions',
     engagement: '💬 Engagement (%)'
   };
 
   useEffect(() => {
     fetchGraphs();
+    // Reset states on mount
+    setViewGraphId(null);
+    setPreview(null);
+    setShowForm(false);
   }, [user]);
+
+  // Scroll to preview when it appears
+  useEffect(() => {
+    if (preview) {
+      setTimeout(() => {
+        const previewElement = document.getElementById('preview-section');
+        if (previewElement) {
+          previewElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  }, [preview]);
 
   const fetchGraphs = async () => {
     try {
@@ -61,7 +79,7 @@ function AnalyticsGraph({ user, onBack }) {
       return;
     }
 
-    if (formData.some(d => !d.day || !d. visitors)) {
+    if (formData.some(d => !d.day || !d.visitors)) {
       setError('⚠️ Please fill all data');
       return;
     }
@@ -69,6 +87,11 @@ function AnalyticsGraph({ user, onBack }) {
     try {
       const days = formData.map(d => d.day);
       const values = formData.map(d => parseInt(d.visitors));
+
+      if (values.some(v => isNaN(v))) {
+        setError('⚠️ Please enter valid numbers');
+        return;
+      }
 
       const previewData = {
         labels: days,
@@ -103,13 +126,22 @@ function AnalyticsGraph({ user, onBack }) {
     try {
       const graphData = {
         labels: preview.labels,
-        datasets: preview.datasets,
-        type: chartType
+        data: preview.datasets[0].data,
+        type: chartType,
+        metric: metric
       };
 
-      await saveGraphData(user. uid, 'analytics', reportName, graphData);
-      alert('✅ Analytics report saved!');
-      
+      if (editGraphId) {
+        // Update existing graph
+        await updateGraphData(user.uid, 'analytics', editGraphId, reportName, graphData);
+        alert('✅ Analytics report updated!');
+        setEditGraphId(null);
+      } else {
+        // Save new graph
+        await saveGraphData(user.uid, 'analytics', reportName, graphData);
+        alert('✅ Analytics report saved!');
+      }
+
       setFormData([{ day: '', visitors: '' }]);
       setReportName('');
       setPreview(null);
@@ -138,12 +170,77 @@ function AnalyticsGraph({ user, onBack }) {
     }
   };
 
+  const handleEdit = async (graphId, graphData) => {
+    setEditGraphId(graphId);
+    setReportName(graphData.name);
+    setMetric(graphData.metric || 'traffic');
+    setChartType(graphData.type);
+    setFormData(graphData.labels.map((label, idx) => ({
+      day: label,
+      visitors: graphData.data[idx]
+    })));
+    setPreview(null);  // Clear preview when starting edit
+    setError('');  // Clear any errors
+    setShowForm(true);
+  };
+
+  const handleViewGraph = (graphId) => {
+    setViewGraphId(graphId);
+  };
+
   const graphCount = Object.keys(graphs).length;
+
+  // View full graph page
+  if (viewGraphId && graphs[viewGraphId]) {
+    const graph = graphs[viewGraphId];
+    const chartData = {
+      labels: graph.labels,
+      datasets: [
+        {
+          label: graph.name,
+          data: graph.data,
+          borderColor: '#AA96DA',
+          backgroundColor: 'rgba(170, 150, 218, 0.3)',
+          tension: 0.3
+        }
+      ]
+    };
+
+    return (
+      <div className="category-page-container">
+        <button className="back-btn" onClick={() => setViewGraphId(null)}>← Back</button>
+
+        <h1>{graph.name}</h1>
+        <p>📅 Created: {new Date(graph.createdAt).toLocaleDateString()}</p>
+        <p>📈 Type: {graph.type.toUpperCase()}</p>
+        <p>📊 Metric: {metrics[graph.metric] || 'Traffic'}</p>
+
+        <div className="graph-actions">
+          <button className="edit-btn" onClick={() => {
+            handleEdit(viewGraphId, graph);
+            setViewGraphId(null);
+          }}>
+            ✏️ Edit
+          </button>
+          <button className="delete-btn" onClick={() => {
+            handleDelete(viewGraphId);
+            setViewGraphId(null);
+          }}>
+            🗑️ Delete
+          </button>
+        </div>
+
+        <div className="graph-display">
+          <Graph type={graph.type} title={graph.name} data={chartData} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="category-page-container">
       <button className="back-btn" onClick={onBack}>← Back to Home</button>
-      
+
       <div className="category-header" style={{ borderLeft: '5px solid #AA96DA' }}>
         <h1>📈 Analytics Graphs</h1>
         <p>Track website and app performance</p>
@@ -178,8 +275,9 @@ function AnalyticsGraph({ user, onBack }) {
           <div className="form-group">
             <label>Chart Type *</label>
             <select value={chartType} onChange={(e) => setChartType(e.target.value)}>
-              <option value="line">📈 Line Chart</option>
-              <option value="bar">📊 Bar Chart</option>
+              <option value="line">Line Chart</option>
+              <option value="bar">Bar Chart</option>
+              <option value="pie">Pie Chart</option>
             </select>
           </div>
 
@@ -196,12 +294,12 @@ function AnalyticsGraph({ user, onBack }) {
                 <input
                   type="number"
                   placeholder="Value"
-                  value={item. visitors}
-                  onChange={(e) => handleInputChange(index, 'visitors', e.target. value)}
+                  value={item.visitors}
+                  onChange={(e) => handleInputChange(index, 'visitors', e.target.value)}
                 />
                 {formData.length > 1 && (
-                  <button 
-                    className="remove-btn" 
+                  <button
+                    className="remove-btn"
                     onClick={() => handleRemoveInput(index)}
                   >
                     ✕
@@ -218,9 +316,9 @@ function AnalyticsGraph({ user, onBack }) {
 
           <div className="form-buttons">
             <button className="preview-btn" onClick={handlePreview}>👁️ Preview</button>
-            <button 
-              className="save-btn" 
-              onClick={handleSave} 
+            <button
+              className="save-btn"
+              onClick={handleSave}
               disabled={!preview || saving}
             >
               {saving ? '⏳ Saving...' : '💾 Save'}
@@ -229,16 +327,18 @@ function AnalyticsGraph({ user, onBack }) {
         </div>
       )}
 
-      {preview && (
-        <div className="preview-section">
-          <h2>📊 Preview</h2>
-          <div className="graph-display">
-            <Graph type={chartType} title={reportName} data={preview} />
-          </div>
-        </div>
-      )}
+      {/* Preview */}
+       {preview && (
+         <div className="preview-section" id="preview-section">
+           <h2>📊 Preview</h2>
+           <div className="graph-display">
+             <Graph type={chartType} title={reportName} data={preview} />
+           </div>
+         </div>
+       )}
 
-      <div className="graphs-list">
+       {!showForm && (
+       <div className="graphs-list">
         {loading ? (
           <p style={{ textAlign: 'center' }}>Loading graphs...</p>
         ) : graphCount === 0 ? (
@@ -250,19 +350,27 @@ function AnalyticsGraph({ user, onBack }) {
             <div key={id} className="graph-item-card">
               <div className="graph-item-content">
                 <h3>{graph.name}</h3>
-                <p>📅 Created: {new Date(graph. createdAt).toLocaleDateString()}</p>
+                <p>📅 Created: {new Date(graph.createdAt).toLocaleDateString()}</p>
+                <p className="graph-type">Metric: {graph.metric || 'Traffic'}</p>
               </div>
               <div className="graph-item-actions">
+                <button className="preview-btn" onClick={() => handleViewGraph(id)}>
+                  👁️ Preview
+                </button>
+                <button className="edit-btn" onClick={() => handleEdit(id, graph)}>
+                  ✏️ Edit
+                </button>
                 <button className="delete-btn" onClick={() => handleDelete(id)}>
                   🗑️ Delete
                 </button>
               </div>
             </div>
           ))
-        )}
-      </div>
-    </div>
-  );
-}
+          )}
+          </div>
+          )}
+          </div>
+          );
+          }
 
-export default AnalyticsGraph;
+          export default AnalyticsGraph;

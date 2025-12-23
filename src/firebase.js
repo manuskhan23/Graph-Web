@@ -100,7 +100,7 @@ export async function saveGraphData(uid, graphType, graphName, graphData) {
     const graphId = Date.now().toString();
     
     // Clean and validate data
-    if (!graphData || !graphData.labels || !graphData.data) {
+    if (!graphData || !graphData.labels) {
       throw new Error('Invalid graph data structure');
     }
 
@@ -109,16 +109,20 @@ export async function saveGraphData(uid, graphType, graphName, graphData) {
       ? graphData.labels.filter(l => l !== null && l !== undefined)
       : [];
     
-    const data = Array.isArray(graphData.data) 
-      ? graphData.data.filter(d => d !== null && d !== undefined && !isNaN(d))
-      : [];
-
-    if (labels.length === 0 || data.length === 0) {
-      throw new Error('Labels and data cannot be empty');
+    // Handle both flat data and datasets format
+    let data = [];
+    if (graphData.datasets) {
+      // Multi-dataset format (Education graphs)
+      data = graphData.datasets;
+    } else if (graphData.data) {
+      // Single dataset format
+      data = Array.isArray(graphData.data) 
+        ? graphData.data.filter(d => d !== null && d !== undefined && !isNaN(d))
+        : [];
     }
 
-    if (labels.length !== data.length) {
-      throw new Error('Labels and data length must match');
+    if (labels.length === 0) {
+      throw new Error('Labels cannot be empty');
     }
 
     // Build clean graph object
@@ -167,6 +171,36 @@ export async function getGraph(uid, graphType, graphId) {
     return snapshot.exists() ? snapshot.val() : null;
   } catch (error) {
     console.error('Error fetching graph:', error);
+    throw error;
+  }
+}
+
+// ✅ Update graph
+export async function updateGraphData(uid, graphType, graphId, graphName, graphData) {
+  try {
+    const cleanGraphData = {
+      name: graphName || 'Untitled Graph',
+      type: graphData.type || 'line',
+      labels: graphData.labels || [],
+      data: graphData.data || [],
+      updatedAt: serverTimestamp()
+    };
+
+    // Add optional fields if they exist
+    if (graphData.metric) {
+      cleanGraphData.metric = graphData.metric;
+    }
+    if (graphData.datasets) {
+      cleanGraphData.datasets = graphData.datasets;
+    }
+    if (graphData.weatherType) {
+      cleanGraphData.weatherType = graphData.weatherType;
+    }
+
+    await set(ref(database, `graphs/${uid}/${graphType}/${graphId}`), cleanGraphData);
+    return graphId;
+  } catch (error) {
+    console.error('Error updating graph:', error);
     throw error;
   }
 }

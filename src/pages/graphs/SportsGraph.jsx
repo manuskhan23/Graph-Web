@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { getUserGraphs, saveGraphData, database } from '../../firebase';
+import { getUserGraphs, saveGraphData, updateGraphData, database } from '../../firebase';
 import { ref, remove } from 'firebase/database';
 import Graph from '../../components/Graph';
+import { showSuccessAlert, showErrorAlert, showConfirmDeleteAlert } from '../../utils/alerts';
 
 function SportsGraph({ user, onBack }) {
   const [graphs, setGraphs] = useState({});
@@ -15,10 +16,27 @@ function SportsGraph({ user, onBack }) {
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [viewGraphId, setViewGraphId] = useState(null);
+  const [editGraphId, setEditGraphId] = useState(null);
 
   useEffect(() => {
     fetchGraphs();
+    setViewGraphId(null);
+    setPreview(null);
+    setShowForm(false);
   }, [user]);
+
+  // Scroll to preview when it appears
+  useEffect(() => {
+    if (preview) {
+      setTimeout(() => {
+        const previewElement = document.getElementById('preview-section');
+        if (previewElement) {
+          previewElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  }, [preview]);
 
   const fetchGraphs = async () => {
     try {
@@ -43,24 +61,29 @@ function SportsGraph({ user, onBack }) {
 
   const handleRemoveInput = (index) => {
     if (formData.length > 1) {
-      setFormData(formData. filter((_, i) => i !== index));
+      setFormData(formData.filter((_, i) => i !== index));
     }
   };
 
   const handlePreview = () => {
     if (!reportName.trim()) {
-       setError('[!] Please enter report name');
+      setError('[!] Please enter report name');
       return;
     }
 
     if (formData.some(d => !d.match || !d.teamScore)) {
-       setError('[!] Please fill all match data');
+      setError('[!] Please fill all match data');
       return;
     }
 
     try {
       const matches = formData.map(d => d.match);
       const scores = formData.map(d => parseInt(d.teamScore));
+
+      if (scores.some(v => isNaN(v))) {
+        setError('[!] Please enter valid numbers');
+        return;
+      }
 
       const previewData = {
         labels: matches,
@@ -93,14 +116,22 @@ function SportsGraph({ user, onBack }) {
 
     try {
       const graphData = {
-        labels: preview. labels,
-        datasets: preview. datasets,
+        labels: preview.labels,
+        data: preview.datasets[0].data,
         type: chartType
       };
 
-      await saveGraphData(user.uid, 'sports', reportName, graphData);
-      alert('[✓] Sports report saved!');
-      
+      if (editGraphId) {
+         // Update existing graph
+         await updateGraphData(user.uid, 'sports', editGraphId, reportName, graphData);
+         showSuccessAlert('Updated!', 'Sports report updated successfully');
+         setEditGraphId(null);
+       } else {
+         // Save new graph
+         await saveGraphData(user.uid, 'sports', reportName, graphData);
+         showSuccessAlert('Saved!', 'Sports report saved successfully');
+       }
+
       setFormData([{ match: '', teamScore: '' }]);
       setReportName('');
       setPreview(null);
@@ -114,7 +145,8 @@ function SportsGraph({ user, onBack }) {
   };
 
   const handleDelete = async (graphId) => {
-    if (!window.confirm('Delete this graph?')) return;
+    const result = await showConfirmDeleteAlert();
+    if (!result.isConfirmed) return;
 
     try {
       await remove(ref(database, `graphs/${user.uid}/sports/${graphId}`));
@@ -123,20 +155,83 @@ function SportsGraph({ user, onBack }) {
         delete updated[graphId];
         return updated;
       });
-      alert('[✓] Graph deleted!');
+      showSuccessAlert('Deleted!', 'Graph deleted successfully');
     } catch (err) {
-      alert('[✗] Error: ' + err.message);
+      showErrorAlert('Error!', 'Failed to delete graph: ' + err.message);
     }
+  };
+
+  const handleEdit = async (graphId, graphData) => {
+    setEditGraphId(graphId);
+    setReportName(graphData.name);
+    setChartType(graphData.type);
+    setFormData(graphData.labels.map((label, idx) => ({
+      match: label,
+      teamScore: graphData.data[idx]
+    })));
+    setPreview(null);  // Clear preview when starting edit
+    setError('');  // Clear any errors
+    setShowForm(true);
+  };
+
+  const handleViewGraph = (graphId) => {
+    setViewGraphId(graphId);
   };
 
   const graphCount = Object.keys(graphs).length;
 
+  // View full graph page
+  if (viewGraphId && graphs[viewGraphId]) {
+    const graph = graphs[viewGraphId];
+    const chartData = {
+      labels: graph.labels,
+      datasets: [
+        {
+          label: graph.name,
+          data: graph.data,
+          borderColor: '#FFE66D',
+          backgroundColor: 'rgba(255, 230, 109, 0.6)',
+          tension: 0.3
+        }
+      ]
+    };
+
+    return (
+      <div className="category-page-container">
+        <button className="back-btn" onClick={() => setViewGraphId(null)}>← Back</button>
+
+        <h1>{graph.name}</h1>
+        <p>Created: {new Date(graph.createdAt).toLocaleDateString()}</p>
+        <p>Type: {graph.type.toUpperCase()}</p>
+
+        <div className="graph-actions">
+          <button className="edit-btn" onClick={() => {
+            handleEdit(viewGraphId, graph);
+            setViewGraphId(null);
+          }}>
+            Edit
+          </button>
+          <button className="delete-btn" onClick={() => {
+            handleDelete(viewGraphId);
+            setViewGraphId(null);
+          }}>
+            Delete
+          </button>
+        </div>
+
+        <div className="graph-display">
+          <Graph type={graph.type} title={graph.name} data={chartData} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="category-page-container">
       <button className="back-btn" onClick={onBack}>← Back to Home</button>
-      
+
       <div className="category-header" style={{ borderLeft: '5px solid #FFE66D' }}>
-         <h1>Sports Graphs</h1>
+        <h1>Sports Graphs</h1>
         <p>Track match results and team performance</p>
       </div>
 
@@ -161,6 +256,7 @@ function SportsGraph({ user, onBack }) {
             <select value={chartType} onChange={(e) => setChartType(e.target.value)}>
               <option value="bar">Bar Chart</option>
               <option value="line">Line Chart</option>
+              <option value="pie">Pie Chart</option>
             </select>
           </div>
 
@@ -181,8 +277,8 @@ function SportsGraph({ user, onBack }) {
                   onChange={(e) => handleInputChange(index, 'teamScore', e.target.value)}
                 />
                 {formData.length > 1 && (
-                  <button 
-                    className="remove-btn" 
+                  <button
+                    className="remove-btn"
                     onClick={() => handleRemoveInput(index)}
                   >
                     ✕
@@ -199,9 +295,9 @@ function SportsGraph({ user, onBack }) {
 
           <div className="form-buttons">
             <button className="preview-btn" onClick={handlePreview}>Preview</button>
-            <button 
-              className="save-btn" 
-              onClick={handleSave} 
+            <button
+              className="save-btn"
+              onClick={handleSave}
               disabled={!preview || saving}
             >
               {saving ? 'Saving...' : 'Save'}
@@ -210,16 +306,18 @@ function SportsGraph({ user, onBack }) {
         </div>
       )}
 
-      {preview && (
-        <div className="preview-section">
-          <h2>Preview</h2>
-          <div className="graph-display">
-            <Graph type={chartType} title={reportName} data={preview} />
-          </div>
-        </div>
-      )}
+      {/* Preview */}
+       {preview && (
+         <div className="preview-section" id="preview-section">
+           <h2>Preview</h2>
+           <div className="graph-display">
+             <Graph type={chartType} title={reportName} data={preview} />
+           </div>
+         </div>
+       )}
 
-      <div className="graphs-list">
+       {!showForm && (
+       <div className="graphs-list">
         {loading ? (
           <p style={{ textAlign: 'center' }}>Loading graphs...</p>
         ) : graphCount === 0 ? (
@@ -234,16 +332,23 @@ function SportsGraph({ user, onBack }) {
                 <p>Created: {new Date(graph.createdAt).toLocaleDateString()}</p>
               </div>
               <div className="graph-item-actions">
+                <button className="preview-btn" onClick={() => handleViewGraph(id)}>
+                  Preview
+                </button>
+                <button className="edit-btn" onClick={() => handleEdit(id, graph)}>
+                  Edit
+                </button>
                 <button className="delete-btn" onClick={() => handleDelete(id)}>
                   Delete
                 </button>
               </div>
             </div>
           ))
-        )}
-      </div>
-    </div>
-  );
-}
+          )}
+          </div>
+          )}
+          </div>
+          );
+          }
 
-export default SportsGraph;
+          export default SportsGraph;

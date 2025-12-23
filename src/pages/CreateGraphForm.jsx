@@ -79,6 +79,15 @@ function CreateGraphForm({ user, categoryType, onBack }) {
 
       await saveGraphData(user.uid, categoryType, graphName, graphData);
       alert('[✓] Graph saved successfully!');
+      
+      // Reset form state
+      setGraphName('');
+      setLabels('');
+      setData('');
+      setChartType('line');
+      setPreview(null);
+      setError('');
+      
       onBack();
     } catch (err) {
       setError(`[✗] Error saving graph: ${err.message}`);
@@ -150,7 +159,7 @@ function CreateGraphForm({ user, categoryType, onBack }) {
       </div>
 
       {preview && (
-        <div className="preview-section">
+        <div className="preview-section-inline">
           <h2>Graph Preview</h2>
           <Graph type={chartType} title={graphName} data={preview} />
         </div>

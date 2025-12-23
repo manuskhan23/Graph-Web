@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { getUserGraphs, saveGraphData, database } from '../../firebase';
+import { getUserGraphs, saveGraphData, updateGraphData, database } from '../../firebase';
 import { ref, remove } from 'firebase/database';
 import Graph from '../../components/Graph';
+import { showSuccessAlert, showErrorAlert, showConfirmDeleteAlert } from '../../utils/alerts';
 
 function HealthGraph({ user, onBack }) {
   const [graphs, setGraphs] = useState({});
@@ -16,6 +17,8 @@ function HealthGraph({ user, onBack }) {
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [viewGraphId, setViewGraphId] = useState(null);
+  const [editGraphId, setEditGraphId] = useState(null);
 
   const metrics = {
     weight: 'Weight (kg)',
@@ -26,7 +29,22 @@ function HealthGraph({ user, onBack }) {
 
   useEffect(() => {
     fetchGraphs();
+    setViewGraphId(null);
+    setPreview(null);
+    setShowForm(false);
   }, [user]);
+
+  // Scroll to preview when it appears
+  useEffect(() => {
+    if (preview) {
+      setTimeout(() => {
+        const previewElement = document.getElementById('preview-section');
+        if (previewElement) {
+          previewElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  }, [preview]);
 
   const fetchGraphs = async () => {
     try {
@@ -57,12 +75,12 @@ function HealthGraph({ user, onBack }) {
 
   const handlePreview = () => {
     if (!reportName.trim()) {
-       setError('[!] Please enter report name');
+      setError('[!] Please enter report name');
       return;
     }
 
     if (formData.some(d => !d.day || !d.weight)) {
-       setError('[!] Please fill all data');
+      setError('[!] Please fill all data');
       return;
     }
 
@@ -70,14 +88,19 @@ function HealthGraph({ user, onBack }) {
       const days = formData.map(d => d.day);
       const values = formData.map(d => parseFloat(d.weight));
 
+      if (values.some(v => isNaN(v))) {
+        setError('[!] Please enter valid numbers');
+        return;
+      }
+
       const previewData = {
         labels: days,
-        datasets:  [
+        datasets: [
           {
             label: metrics[metric],
             data: values,
             borderColor: '#95E1D3',
-            backgroundColor:  'rgba(149, 225, 211, 0.3)',
+            backgroundColor: 'rgba(149, 225, 211, 0.3)',
             fill: true,
             tension: 0.3
           }
@@ -103,13 +126,22 @@ function HealthGraph({ user, onBack }) {
     try {
       const graphData = {
         labels: preview.labels,
-        datasets: preview.datasets,
-        type: chartType
+        data: preview.datasets[0].data,
+        type: chartType,
+        metric: metric
       };
 
-      await saveGraphData(user.uid, 'health', reportName, graphData);
-      alert('[✓] Health report saved!');
-      
+      if (editGraphId) {
+        // Update existing graph
+        await updateGraphData(user.uid, 'health', editGraphId, reportName, graphData);
+        showSuccessAlert('Updated!', 'Health report updated successfully');
+        setEditGraphId(null);
+      } else {
+        // Save new graph
+        await saveGraphData(user.uid, 'health', reportName, graphData);
+        showSuccessAlert('Saved!', 'Health report saved successfully');
+      }
+
       setFormData([{ day: '', weight: '' }]);
       setReportName('');
       setPreview(null);
@@ -123,7 +155,8 @@ function HealthGraph({ user, onBack }) {
   };
 
   const handleDelete = async (graphId) => {
-    if (!window.confirm('Delete this graph?')) return;
+    const result = await showConfirmDeleteAlert();
+    if (!result.isConfirmed) return;
 
     try {
       await remove(ref(database, `graphs/${user.uid}/health/${graphId}`));
@@ -132,20 +165,85 @@ function HealthGraph({ user, onBack }) {
         delete updated[graphId];
         return updated;
       });
-      alert('[✓] Graph deleted!');
+      showSuccessAlert('Deleted!', 'Graph deleted successfully');
     } catch (err) {
-      alert('[✗] Error: ' + err.message);
+      showErrorAlert('Error!', 'Failed to delete graph: ' + err.message);
     }
+  };
+
+  const handleEdit = async (graphId, graphData) => {
+    setEditGraphId(graphId);
+    setReportName(graphData.name);
+    setMetric(graphData.metric || 'weight');
+    setChartType(graphData.type);
+    setFormData(graphData.labels.map((label, idx) => ({
+      day: label,
+      weight: graphData.data[idx]
+    })));
+    setPreview(null);  // Clear preview when starting edit
+    setError('');  // Clear any errors
+    setShowForm(true);
+  };
+
+  const handleViewGraph = (graphId) => {
+    setViewGraphId(graphId);
   };
 
   const graphCount = Object.keys(graphs).length;
 
+  // View full graph page
+  if (viewGraphId && graphs[viewGraphId]) {
+    const graph = graphs[viewGraphId];
+    const chartData = {
+      labels: graph.labels,
+      datasets: [
+        {
+          label: graph.name,
+          data: graph.data,
+          borderColor: '#95E1D3',
+          backgroundColor: 'rgba(149, 225, 211, 0.3)',
+          tension: 0.3
+        }
+      ]
+    };
+
+    return (
+      <div className="category-page-container">
+        <button className="back-btn" onClick={() => setViewGraphId(null)}>← Back</button>
+
+        <h1>{graph.name}</h1>
+        <p>Created: {new Date(graph.createdAt).toLocaleDateString()}</p>
+        <p>Type: {graph.type.toUpperCase()}</p>
+        <p>Metric: {metrics[graph.metric] || 'Weight'}</p>
+
+        <div className="graph-actions">
+          <button className="edit-btn" onClick={() => {
+            handleEdit(viewGraphId, graph);
+            setViewGraphId(null);
+          }}>
+            Edit
+          </button>
+          <button className="delete-btn" onClick={() => {
+            handleDelete(viewGraphId);
+            setViewGraphId(null);
+          }}>
+            Delete
+          </button>
+        </div>
+
+        <div className="graph-display">
+          <Graph type={graph.type} title={graph.name} data={chartData} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="category-page-container">
       <button className="back-btn" onClick={onBack}>← Back to Home</button>
-      
+
       <div className="category-header" style={{ borderLeft: '5px solid #95E1D3' }}>
-         <h1>Health Graphs</h1>
+        <h1>Health Graphs</h1>
         <p>Monitor your health metrics over time</p>
       </div>
 
@@ -180,6 +278,7 @@ function HealthGraph({ user, onBack }) {
             <select value={chartType} onChange={(e) => setChartType(e.target.value)}>
               <option value="line">Line Chart</option>
               <option value="bar">Bar Chart</option>
+              <option value="pie">Pie Chart</option>
             </select>
           </div>
 
@@ -201,8 +300,8 @@ function HealthGraph({ user, onBack }) {
                   step="0.1"
                 />
                 {formData.length > 1 && (
-                  <button 
-                    className="remove-btn" 
+                  <button
+                    className="remove-btn"
                     onClick={() => handleRemoveInput(index)}
                   >
                     ✕
@@ -219,9 +318,9 @@ function HealthGraph({ user, onBack }) {
 
           <div className="form-buttons">
             <button className="preview-btn" onClick={handlePreview}>Preview</button>
-            <button 
-              className="save-btn" 
-              onClick={handleSave} 
+            <button
+              className="save-btn"
+              onClick={handleSave}
               disabled={!preview || saving}
             >
               {saving ? 'Saving...' : 'Save'}
@@ -230,16 +329,18 @@ function HealthGraph({ user, onBack }) {
         </div>
       )}
 
-      {preview && (
-        <div className="preview-section">
-          <h2>Preview</h2>
-          <div className="graph-display">
-            <Graph type={chartType} title={reportName} data={preview} />
-          </div>
-        </div>
-      )}
+      {/* Preview */}
+       {preview && (
+         <div className="preview-section" id="preview-section">
+           <h2>Preview</h2>
+           <div className="graph-display">
+             <Graph type={chartType} title={reportName} data={preview} />
+           </div>
+         </div>
+       )}
 
-      <div className="graphs-list">
+       {!showForm && (
+       <div className="graphs-list">
         {loading ? (
           <p style={{ textAlign: 'center' }}>Loading graphs...</p>
         ) : graphCount === 0 ? (
@@ -252,18 +353,26 @@ function HealthGraph({ user, onBack }) {
               <div className="graph-item-content">
                 <h3>{graph.name}</h3>
                 <p>Created: {new Date(graph.createdAt).toLocaleDateString()}</p>
+                <p className="graph-type">Metric: {graph.metric || 'Weight'}</p>
               </div>
               <div className="graph-item-actions">
+                <button className="preview-btn" onClick={() => handleViewGraph(id)}>
+                  Preview
+                </button>
+                <button className="edit-btn" onClick={() => handleEdit(id, graph)}>
+                  Edit
+                </button>
                 <button className="delete-btn" onClick={() => handleDelete(id)}>
                   Delete
                 </button>
               </div>
             </div>
           ))
-        )}
-      </div>
-    </div>
-  );
-}
+          )}
+          </div>
+          )}
+          </div>
+          );
+          }
 
-export default HealthGraph;
+          export default HealthGraph;

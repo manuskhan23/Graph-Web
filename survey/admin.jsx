@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ref, onValue, remove } from 'firebase/database';
 import { surveyDatabase } from './surveyFirebase';
+import AdminManager from './adminManager';
 import './admin.css';
 
 function AdminDashboard({ onBack }) {
@@ -147,10 +148,10 @@ function AdminDashboard({ onBack }) {
           Responses ({surveys.length})
         </button>
         <button
-          className={`admin-nav-btn ${view === 'export' ? 'active' : ''}`}
-          onClick={() => setView('export')}
+          className={`admin-nav-btn ${view === 'manage-admins' ? 'active' : ''}`}
+          onClick={() => setView('manage-admins')}
         >
-          Export
+          👥 Manage Admins
         </button>
       </div>
 
@@ -317,47 +318,9 @@ function AdminDashboard({ onBack }) {
         </div>
       )}
 
-      {/* Export View */}
-      {view === 'export' && (
-        <div className="admin-export">
-          <div className="export-section">
-            <h2>Export Survey Data</h2>
-            <p className="export-description">Download all survey responses in your preferred format</p>
-
-            <div className="export-options">
-              <div className="export-card">
-                <div className="export-icon">📊</div>
-                <h3>CSV Format</h3>
-                <p>Excel-compatible spreadsheet format</p>
-                <button
-                  className="btn-export"
-                  onClick={handleExportCSV}
-                  disabled={surveys.length === 0}
-                >
-                  Export as CSV
-                </button>
-              </div>
-
-              <div className="export-card">
-                <div className="export-icon">📋</div>
-                <h3>JSON Format</h3>
-                <p>Raw JSON data format for developers</p>
-                <button
-                  className="btn-export"
-                  onClick={handleExportJSON}
-                  disabled={surveys.length === 0}
-                >
-                  Export as JSON
-                </button>
-              </div>
-            </div>
-
-            <div className="export-info">
-              <p><strong>Total Records:</strong> {surveys.length}</p>
-              <p><strong>File includes:</strong> Name, Father Name, Class, Section, Platform, Time Spent, Timestamp</p>
-            </div>
-          </div>
-        </div>
+      {/* Manage Admins View */}
+      {view === 'manage-admins' && (
+        <AdminManager onBack={() => setView('dashboard')} />
       )}
     </div>
   );

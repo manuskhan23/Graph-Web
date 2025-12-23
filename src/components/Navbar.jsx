@@ -1,14 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { logout, getCurrentUser } from '../firebase';
+import { getDatabase, ref, onValue } from 'firebase/database';
 
 function Navbar({ onLogout, onPageChange, currentPage }) {
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isMainAdmin, setIsMainAdmin] = useState(false);
+  const mainAdminEmail = 'anus2580@gmail.com';
 
   useEffect(() => {
     const checkAdmin = async () => {
       const user = getCurrentUser();
-      if (user && user.email === 'anus2580@gmail.com') {
+      if (!user) return;
+
+      const userEmail = user.email;
+
+      // Check if main admin
+      if (userEmail === mainAdminEmail) {
+        setIsMainAdmin(true);
         setIsAdmin(true);
+        return;
+      }
+
+      // Check if in added admins list
+      try {
+        const surveyDb = getDatabase();
+        const adminsRef = ref(surveyDb, 'admins');
+
+        onValue(adminsRef, (snapshot) => {
+          const admins = [];
+          snapshot.forEach((childSnapshot) => {
+            admins.push(childSnapshot.val().email);
+          });
+
+          if (admins.includes(userEmail)) {
+            setIsAdmin(true);
+          }
+        }, { onlyOnce: true });
+      } catch (error) {
+        console.error('Error checking admin status:', error);
       }
     };
     checkAdmin();
@@ -54,6 +83,14 @@ function Navbar({ onLogout, onPageChange, currentPage }) {
             >
               ⚙️ Admin Dashboard
             </button>
+            {isMainAdmin && (
+              <button
+                className={currentPage === 'admin-manager' ? 'nav-btn active' : 'nav-btn'}
+                onClick={() => onPageChange('admin-manager')}
+              >
+                👥 Manage Admins
+              </button>
+            )}
           </>
         )}
         <button onClick={handleLogout} className="logout-btn">

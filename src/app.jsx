@@ -13,6 +13,7 @@ import AnalyticsGraph from './pages/graphs/AnalyticsGraph.jsx';
 import SurveyForm from '../survey/form.jsx';
 import SurveyGraph from '../survey/graph.jsx';
 import AdminDashboard from '../survey/admin.jsx';
+import AdminManager from '../survey/adminManager.jsx';
 import Navbar from './components/Navbar.jsx';
 import Footer from './components/Footer.jsx';
 import './styles/main.css';
@@ -162,6 +163,10 @@ function App() {
 
         {user && currentPage === 'admin-dashboard' && (
           <AdminDashboard onBack={() => setCurrentPage('home')} />
+        )}
+
+        {user && currentPage === 'admin-manager' && (
+          <AdminManager onBack={() => setCurrentPage('home')} />
         )}
       </main>
 

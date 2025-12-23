@@ -1,50 +1,83 @@
-const API_URL = 'http://localhost:5000/api';
+const LOCAL_API_URL = 'http://localhost:5000/api';
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_API_KEY = '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';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
+// Try local backend first, fallback to Groq API
 export async function sendMessage(message) {
   try {
-    console.log('[→] Sending message to backend:', message);
+    console.log('[→] Trying local backend first...');
     
-    const response = await fetch(`${API_URL}/chat`, {
+    // Try local backend
+    const localResponse = await Promise.race([
+      fetch(`${LOCAL_API_URL}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+    ]);
+
+    if (localResponse.ok) {
+      const data = await localResponse.json();
+      console.log('[✓] Response from local backend');
+      return data;
+    }
+  } catch (localError) {
+    console.log('[!] Local backend unavailable, using Groq API...');
+  }
+
+  // Fallback to Groq API
+  try {
+    console.log('[→] Sending message to Groq API...');
+    
+    const response = await fetch(GROQ_API_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        message: message
+        model: GROQ_MODEL,
+        messages: [{ role: 'user', content: message }],
+        temperature: 0.7,
+        max_tokens: 1024
       })
     });
 
-    console.log('[←] Response status:', response.status);
-
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(errorData.error?.message || `API error: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('[✓] Response received:', data);
-    return data;
+    const aiMessage = data.choices[0].message.content;
+    
+    console.log('[✓] Response from Groq API');
+    return {
+      success: true,
+      message: aiMessage,
+      user_message: message
+    };
   } catch (error) {
-    console.error('[✗] Error sending message:', error.message);
-    
-    if (error.message.includes('Failed to fetch')) {
-      console.error('[!] Backend server is not running!');
-      console.error('[•] Please run: cd backend && python server.py');
-      throw new Error('Backend server is not running. Please start the Python server.');
-    }
-    
-    throw error;
+    console.error('[✗] Error:', error.message);
+    throw new Error(`AI Service Error: ${error.message}`);
   }
 }
 
 export async function checkBackendHealth() {
   try {
-    const response = await fetch(`${API_URL}/health`);
+    // Check local backend
+    const response = await Promise.race([
+      fetch(`${LOCAL_API_URL}/health`),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+    ]);
+    
     const data = await response.json();
     console.log('[●] Backend health:', data);
     return response.ok;
   } catch (error) {
-    console.error('[✗] Backend not available:', error);
+    console.log('[!] Local backend not available (will use Groq API)');
     return false;
   }
 }

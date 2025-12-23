@@ -1,0 +1,290 @@
+import React, { useEffect, useState } from 'react';
+import { ref, onValue } from 'firebase/database';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement } from 'chart.js';
+import { Pie, Bar, Line } from 'react-chartjs-2';
+import { surveyDatabase } from './surveyFirebase';
+import './form.css';
+
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement);
+
+function SurveyGraph({ onBack }) {
+  const [surveyData, setSurveyData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [chartType, setChartType] = useState('pie');
+
+  useEffect(() => {
+    const surveysRef = ref(surveyDatabase, 'surveys');
+
+    const unsubscribe = onValue(surveysRef, (snapshot) => {
+      const data = [];
+      snapshot.forEach((childSnapshot) => {
+        data.push(childSnapshot.val());
+      });
+      setSurveyData(data);
+      setLoading(false);
+    }, (error) => {
+      console.error('Error loading survey data:', error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const calculateStatistics = () => {
+    if (surveyData.length === 0) {
+      return {
+        totalResponses: 0,
+        platformStats: {},
+        timeSpentStats: {}
+      };
+    }
+
+    const totalResponses = surveyData.length;
+    const platformStats = {};
+    const timeSpentStats = {
+      '2hrs': 0,
+      '4hrs': 0,
+      '6hrs': 0,
+      '8hrs': 0,
+      '8plus': 0
+    };
+
+    surveyData.forEach(response => {
+      // Platform statistics
+      if (response.platform) {
+        platformStats[response.platform] = (platformStats[response.platform] || 0) + 1;
+      }
+
+      // Time spent statistics
+      if (response.timeSpent) {
+        timeSpentStats[response.timeSpent] = (timeSpentStats[response.timeSpent] || 0) + 1;
+      }
+    });
+
+    // Convert to percentages
+    Object.keys(platformStats).forEach(key => {
+      platformStats[key] = Math.round((platformStats[key] / totalResponses) * 100);
+    });
+
+    Object.keys(timeSpentStats).forEach(key => {
+      timeSpentStats[key] = Math.round((timeSpentStats[key] / totalResponses) * 100);
+    });
+
+    return {
+      totalResponses,
+      platformStats,
+      timeSpentStats
+    };
+  };
+
+  const stats = calculateStatistics();
+
+  // Platform Distribution Chart Data
+  const platformChartData = {
+    labels: Object.keys(stats.platformStats).map(p => p.charAt(0).toUpperCase() + p.slice(1)),
+    datasets: [{
+      label: 'Platform Usage (%)',
+      data: Object.values(stats.platformStats),
+      backgroundColor: [
+        '#FF6B6B',
+        '#4ECDC4',
+        '#45B7D1',
+        '#FFA07A',
+        '#98D8C8',
+        '#F7DC6F',
+        '#BB8FCE'
+      ],
+      borderColor: '#fff',
+      borderWidth: 2
+    }]
+  };
+
+  // Time Spent Chart Data
+  const timeChartData = {
+    labels: ['2 hrs', '4 hrs', '6 hrs', '8 hrs', '8+ hrs'],
+    datasets: [{
+      label: 'Daily Time Spent (%)',
+      data: [
+        stats.timeSpentStats['2hrs'],
+        stats.timeSpentStats['4hrs'],
+        stats.timeSpentStats['6hrs'],
+        stats.timeSpentStats['8hrs'],
+        stats.timeSpentStats['8plus']
+      ],
+      backgroundColor: '#667eea',
+      borderColor: '#764ba2',
+      borderWidth: 2,
+      borderRadius: 6
+    }]
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          font: { size: 12 },
+          padding: 20
+        }
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '40px', color: '#333' }}>
+        <h2>Loading survey data...</h2>
+      </div>
+    );
+  }
+
+  return (
+    <div className="survey-graph-container" style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+      <button 
+        onClick={onBack} 
+        style={{
+          padding: '10px 20px',
+          marginBottom: '20px',
+          background: '#667eea',
+          color: 'white',
+          border: 'none',
+          borderRadius: '6px',
+          cursor: 'pointer',
+          fontWeight: '600'
+        }}
+      >
+        ← Back
+      </button>
+
+      <h1 style={{ color: '#333', marginBottom: '10px' }}>Survey Analytics Dashboard</h1>
+      <p style={{ color: '#666', marginBottom: '30px' }}>Total Responses: <strong>{stats.totalResponses}</strong></p>
+
+      {stats.totalResponses === 0 ? (
+        <div style={{
+          textAlign: 'center',
+          padding: '40px',
+          background: '#f5f5f5',
+          borderRadius: '8px',
+          color: '#666'
+        }}>
+          <h3>No survey responses yet</h3>
+        </div>
+      ) : (
+        <>
+          {/* Chart Type Selector */}
+          <div style={{ marginBottom: '30px', display: 'flex', gap: '10px' }}>
+            {['pie', 'bar', 'line'].map(type => (
+              <button
+                key={type}
+                onClick={() => setChartType(type)}
+                style={{
+                  padding: '10px 20px',
+                  background: chartType === type ? '#667eea' : '#e0e0e0',
+                  color: chartType === type ? 'white' : '#333',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                {type.toUpperCase()} Chart
+              </button>
+            ))}
+          </div>
+
+          {/* Charts */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginBottom: '40px' }}>
+            {/* Platform Chart */}
+            <div style={{
+              background: 'white',
+              padding: '20px',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}>
+              <h3 style={{ color: '#333', marginBottom: '20px' }}>Social Media Platform Usage</h3>
+              {chartType === 'pie' && <Pie data={platformChartData} options={chartOptions} />}
+              {chartType === 'bar' && <Bar data={platformChartData} options={chartOptions} />}
+              {chartType === 'line' && <Line data={platformChartData} options={chartOptions} />}
+            </div>
+
+            {/* Time Spent Chart */}
+            <div style={{
+              background: 'white',
+              padding: '20px',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}>
+              <h3 style={{ color: '#333', marginBottom: '20px' }}>Daily Time Spent on Social Media</h3>
+              {chartType === 'pie' && <Pie data={timeChartData} options={chartOptions} />}
+              {chartType === 'bar' && <Bar data={timeChartData} options={chartOptions} />}
+              {chartType === 'line' && <Line data={timeChartData} options={chartOptions} />}
+            </div>
+          </div>
+
+          {/* Detailed Statistics */}
+          <div style={{
+            background: 'white',
+            padding: '30px',
+            borderRadius: '8px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          }}>
+            <h3 style={{ color: '#333', marginBottom: '20px' }}>Detailed Statistics</h3>
+            
+            <div style={{ marginBottom: '30px' }}>
+              <h4 style={{ color: '#667eea', marginBottom: '15px' }}>Platform Usage Breakdown (%)</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px' }}>
+                {Object.entries(stats.platformStats).map(([platform, percentage]) => (
+                  <div key={platform} style={{
+                    background: '#f5f5f5',
+                    padding: '15px',
+                    borderRadius: '6px',
+                    textAlign: 'center'
+                  }}>
+                    <p style={{ color: '#666', margin: '0 0 8px 0', fontSize: '14px' }}>
+                      {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                    </p>
+                    <p style={{ color: '#667eea', margin: 0, fontSize: '24px', fontWeight: '700' }}>
+                      {percentage}%
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 style={{ color: '#667eea', marginBottom: '15px' }}>Daily Time Spent Breakdown (%)</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px' }}>
+                {[
+                  { label: '2 hours', value: stats.timeSpentStats['2hrs'] },
+                  { label: '4 hours', value: stats.timeSpentStats['4hrs'] },
+                  { label: '6 hours', value: stats.timeSpentStats['6hrs'] },
+                  { label: '8 hours', value: stats.timeSpentStats['8hrs'] },
+                  { label: '8+ hours', value: stats.timeSpentStats['8plus'] }
+                ].map(item => (
+                  <div key={item.label} style={{
+                    background: '#f5f5f5',
+                    padding: '15px',
+                    borderRadius: '6px',
+                    textAlign: 'center'
+                  }}>
+                    <p style={{ color: '#666', margin: '0 0 8px 0', fontSize: '14px' }}>
+                      {item.label}
+                    </p>
+                    <p style={{ color: '#667eea', margin: 0, fontSize: '24px', fontWeight: '700' }}>
+                      {item.value}%
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default SurveyGraph;

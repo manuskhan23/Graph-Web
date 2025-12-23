@@ -10,6 +10,9 @@ import SportsGraph from './pages/graphs/SportsGraph.jsx';
 import HealthGraph from './pages/graphs/HealthGraph.jsx';
 import WeatherGraph from './pages/graphs/WeatherGraph.jsx';
 import AnalyticsGraph from './pages/graphs/AnalyticsGraph.jsx';
+import SurveyForm from '../survey/form.jsx';
+import SurveyGraph from '../survey/graph.jsx';
+import AdminDashboard from '../survey/admin.jsx';
 import Navbar from './components/Navbar.jsx';
 import Footer from './components/Footer.jsx';
 import './styles/main.css';
@@ -17,8 +20,15 @@ import './styles/main.css';
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState('login');
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [surveyCompleted, setSurveyCompleted] = useState(() => {
+    const saved = localStorage.getItem('surveyCompleted');
+    return saved === 'true';
+  });
+  const [currentPage, setCurrentPage] = useState(() => {
+    const surveyDone = localStorage.getItem('surveyCompleted') === 'true';
+    return surveyDone ? 'login' : 'survey';
+  });
 
   useEffect(() => {
     const unsubscribe = onAuthStateReady((authUser) => {
@@ -54,8 +64,16 @@ function App() {
 
   const handleLogout = () => {
     setUser(null);
-    setCurrentPage('login');
+    // If survey was already completed, stay on login page; otherwise show survey
+    const surveyDone = localStorage.getItem('surveyCompleted') === 'true';
+    setCurrentPage(surveyDone ? 'login' : 'survey');
     setSelectedCategory(null);
+  };
+
+  const handleSurveyComplete = () => {
+    localStorage.setItem('surveyCompleted', 'true');
+    setSurveyCompleted(true);
+    setCurrentPage('login');
   };
 
   const handleSelectCategory = (category) => {
@@ -93,7 +111,20 @@ function App() {
   };
 
   if (loading) {
-    return <div style={{ margin: '20px', textAlign: 'center' }}>Checking session...</div>;
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white',
+        fontSize: '18px',
+        fontWeight: '600'
+      }}>
+        Loading your application...
+      </div>
+    );
   }
 
   return (
@@ -101,11 +132,15 @@ function App() {
       {user && <Navbar onLogout={handleLogout} onPageChange={setCurrentPage} currentPage={currentPage} />}
       
       <main className="main-content">
-        {currentPage === 'login' && !user && (
+        {!user && !surveyCompleted && (
+          <SurveyForm onComplete={handleSurveyComplete} />
+        )}
+
+        {!user && surveyCompleted && currentPage === 'login' && (
           <Login onSignupClick={() => setCurrentPage('signup')} onLoginSuccess={() => setCurrentPage('home')} />
         )}
         
-        {currentPage === 'signup' && !user && (
+        {!user && surveyCompleted && currentPage === 'signup' && (
           <Signup onLoginClick={() => setCurrentPage('login')} onSignupSuccess={() => setCurrentPage('home')} />
         )}
         
@@ -119,6 +154,14 @@ function App() {
         
         {user && currentPage === 'category' && selectedCategory && (
           renderCategoryPage()
+        )}
+
+        {user && currentPage === 'survey-graph' && (
+          <SurveyGraph onBack={() => setCurrentPage('home')} />
+        )}
+
+        {user && currentPage === 'admin-dashboard' && (
+          <AdminDashboard onBack={() => setCurrentPage('home')} />
         )}
       </main>
 

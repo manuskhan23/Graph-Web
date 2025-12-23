@@ -1,7 +1,19 @@
-import React from 'react';
-import { logout } from '../firebase';
+import React, { useState, useEffect } from 'react';
+import { logout, getCurrentUser } from '../firebase';
 
 function Navbar({ onLogout, onPageChange, currentPage }) {
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const user = getCurrentUser();
+      if (user && user.email === 'anus2580@gmail.com') {
+        setIsAdmin(true);
+      }
+    };
+    checkAdmin();
+  }, []);
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -28,6 +40,22 @@ function Navbar({ onLogout, onPageChange, currentPage }) {
         >
           AI Assistant
         </button>
+        {isAdmin && (
+          <>
+            <button
+              className={currentPage === 'survey-graph' ? 'nav-btn active' : 'nav-btn'}
+              onClick={() => onPageChange('survey-graph')}
+            >
+              📊 Survey Graph
+            </button>
+            <button
+              className={currentPage === 'admin-dashboard' ? 'nav-btn active' : 'nav-btn'}
+              onClick={() => onPageChange('admin-dashboard')}
+            >
+              ⚙️ Admin Dashboard
+            </button>
+          </>
+        )}
         <button onClick={handleLogout} className="logout-btn">
           Logout
         </button>

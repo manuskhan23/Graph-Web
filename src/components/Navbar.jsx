@@ -70,7 +70,7 @@ function Navbar({ onLogout, onPageChange, currentPage }) {
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
       <div className="container-fluid">
-        <a className="navbar-brand fw-bold fs-5" href="#">📊 MyGraph</a>
+        <a className="navbar-brand fw-bold fs-5" href="#">MyGraph</a>
         <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
           <span className="navbar-toggler-icon"></span>
         </button>
@@ -89,10 +89,16 @@ function Navbar({ onLogout, onPageChange, currentPage }) {
               AI Assistant
             </button>
             <button
+              className={`nav-link ${currentPage === 'calculator' ? 'active' : ''}`}
+              onClick={() => onPageChange('calculator')}
+            >
+              Calculator
+            </button>
+            <button
               className={`nav-link ${currentPage === 'survey-form' ? 'active' : ''}`}
               onClick={() => onPageChange('survey-form')}
             >
-              📝 Survey Form
+              Survey Form
             </button>
             {isAdmin && (
               <>
@@ -100,19 +106,19 @@ function Navbar({ onLogout, onPageChange, currentPage }) {
                   className={`nav-link ${currentPage === 'survey-graph' ? 'active' : ''}`}
                   onClick={() => onPageChange('survey-graph')}
                 >
-                  📊 Survey Graph
+                  Survey Graph
                 </button>
                 <button
                   className={`nav-link ${currentPage === 'admin-dashboard' ? 'active' : ''}`}
                   onClick={() => onPageChange('admin-dashboard')}
                 >
-                  ⚙️ Admin Dashboard
+                  Admin Dashboard
                 </button>
                 <button
                   className={`nav-link ${currentPage === 'admin-manager' ? 'active' : ''}`}
                   onClick={() => onPageChange('admin-manager')}
                 >
-                  👥 Manage Admins
+                  Manage Admins
                 </button>
               </>
             )}

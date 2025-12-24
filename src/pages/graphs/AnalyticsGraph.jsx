@@ -20,10 +20,10 @@ function AnalyticsGraph({ user, onBack }) {
   const [editGraphId, setEditGraphId] = useState(null);
 
   const metrics = {
-    traffic: '👥 Website Traffic',
-    clicks: '🖱️ User Clicks',
-    conversions: '✅ Conversions',
-    engagement: '💬 Engagement (%)'
+    traffic: 'Website Traffic',
+    clicks: 'User Clicks',
+    conversions: 'Conversions',
+    engagement: 'Engagement (%)'
   };
 
   useEffect(() => {
@@ -211,9 +211,9 @@ function AnalyticsGraph({ user, onBack }) {
         <button className="back-btn" onClick={() => setViewGraphId(null)}>← Back</button>
 
         <h1>{graph.name}</h1>
-        <p>📅 Created: {new Date(graph.createdAt).toLocaleDateString()}</p>
-        <p>📈 Type: {graph.type.toUpperCase()}</p>
-        <p>📊 Metric: {metrics[graph.metric] || 'Traffic'}</p>
+        <p>Created: {new Date(graph.createdAt).toLocaleDateString()}</p>
+        <p>Type: {graph.type.toUpperCase()}</p>
+        <p>Metric: {metrics[graph.metric] || 'Traffic'}</p>
 
         <div className="graph-actions">
           <button className="edit-btn" onClick={() => {
@@ -247,7 +247,7 @@ function AnalyticsGraph({ user, onBack }) {
       </div>
 
       <button className="create-btn" onClick={() => setShowForm(!showForm)}>
-        {showForm ? '✕ Close Form' : '➕ Create New Graph'}
+        {showForm ? 'Close Form' : 'Create New Graph'}
       </button>
 
       {showForm && (
@@ -265,10 +265,10 @@ function AnalyticsGraph({ user, onBack }) {
           <div className="form-group">
             <label>Metric *</label>
             <select value={metric} onChange={(e) => setMetric(e.target.value)}>
-              <option value="traffic">👥 Website Traffic</option>
-              <option value="clicks">🖱️ User Clicks</option>
-              <option value="conversions">✅ Conversions</option>
-              <option value="engagement">💬 Engagement (%)</option>
+              <option value="traffic">Website Traffic</option>
+              <option value="clicks">User Clicks</option>
+              <option value="conversions">Conversions</option>
+              <option value="engagement">Engagement (%)</option>
             </select>
           </div>
 
@@ -298,13 +298,13 @@ function AnalyticsGraph({ user, onBack }) {
                   onChange={(e) => handleInputChange(index, 'visitors', e.target.value)}
                 />
                 {formData.length > 1 && (
-                  <button
-                    className="remove-btn"
-                    onClick={() => handleRemoveInput(index)}
-                  >
-                    ✕
-                  </button>
-                )}
+                   <button
+                     className="remove-btn"
+                     onClick={() => handleRemoveInput(index)}
+                   >
+                     Remove
+                   </button>
+                 )}
               </div>
             ))}
             <button className="add-more-btn" onClick={handleAddMore}>
@@ -330,7 +330,7 @@ function AnalyticsGraph({ user, onBack }) {
       {/* Preview */}
        {preview && (
          <div className="preview-section" id="preview-section">
-           <h2>📊 Preview</h2>
+           <h2>Preview</h2>
            <div className="graph-display">
              <Graph type={chartType} title={reportName} data={preview} />
            </div>

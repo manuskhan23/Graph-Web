@@ -6,7 +6,7 @@ const GROQ_MODEL = 'llama-3.3-70b-versatile';
 // Try local backend first, fallback to Groq API
 export async function sendMessage(message) {
   try {
-    console.log('[→] Trying local backend first...');
+    console.log('[INFO] Trying local backend first...');
     
     // Try local backend
     const localResponse = await Promise.race([
@@ -20,16 +20,16 @@ export async function sendMessage(message) {
 
     if (localResponse.ok) {
       const data = await localResponse.json();
-      console.log('[✓] Response from local backend');
+      console.log('[OK] Response from local backend');
       return data;
     }
   } catch (localError) {
-    console.log('[!] Local backend unavailable, using Groq API...');
+    console.log('[WARNING] Local backend unavailable, using Groq API...');
   }
 
   // Fallback to Groq API
   try {
-    console.log('[→] Sending message to Groq API...');
+    console.log('[INFO] Sending message to Groq API...');
     
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
@@ -52,14 +52,14 @@ export async function sendMessage(message) {
     const data = await response.json();
     const aiMessage = data.choices[0].message.content;
     
-    console.log('[✓] Response from Groq API');
+    console.log('[OK] Response from Groq API');
     return {
       success: true,
       message: aiMessage,
       user_message: message
     };
   } catch (error) {
-    console.error('[✗] Error:', error.message);
+    console.error('[ERROR] Error:', error.message);
     throw new Error(`AI Service Error: ${error.message}`);
   }
 }
@@ -73,10 +73,10 @@ export async function checkBackendHealth() {
     ]);
     
     const data = await response.json();
-    console.log('[●] Backend health:', data);
+    console.log('[OK] Backend health:', data);
     return response.ok;
   } catch (error) {
-    console.log('[!] Local backend not available (will use Groq API)');
+    console.log('[WARNING] Local backend not available (will use Groq API)');
     return false;
   }
 }

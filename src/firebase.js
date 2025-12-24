@@ -350,3 +350,61 @@ export async function uploadFileToChat(uid, chatId, file) {
 export function onAuthStateReady(callback) {
   return onAuthStateChanged(auth, callback);
 }
+
+// ✅ Calculator History Functions
+
+// Save calculator history entry
+export async function saveCalculatorHistory(uid, historyEntry) {
+  try {
+    const entryId = Date.now().toString();
+    const historyData = {
+      id: entryId,
+      entry: historyEntry,
+      timestamp: serverTimestamp()
+    };
+    
+    await set(ref(database, `calculatorHistory/${uid}/${entryId}`), historyData);
+    return entryId;
+  } catch (error) {
+    console.error('Error saving calculator history:', error);
+    throw error;
+  }
+}
+
+// Get all calculator history for user
+export async function getCalculatorHistory(uid) {
+  try {
+    const snapshot = await get(ref(database, `calculatorHistory/${uid}`));
+    if (snapshot.exists()) {
+      const data = snapshot.val();
+      // Convert to array and sort by timestamp (newest first)
+      return Object.values(data).sort((a, b) => b.timestamp - a.timestamp);
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching calculator history:', error);
+    throw error;
+  }
+}
+
+// Delete single history entry
+export async function deleteCalculatorHistoryEntry(uid, entryId) {
+  try {
+    const { remove } = await import('firebase/database');
+    await remove(ref(database, `calculatorHistory/${uid}/${entryId}`));
+  } catch (error) {
+    console.error('Error deleting calculator history entry:', error);
+    throw error;
+  }
+}
+
+// Clear all calculator history for user
+export async function clearAllCalculatorHistory(uid) {
+  try {
+    const { remove } = await import('firebase/database');
+    await remove(ref(database, `calculatorHistory/${uid}`));
+  } catch (error) {
+    console.error('Error clearing calculator history:', error);
+    throw error;
+  }
+}

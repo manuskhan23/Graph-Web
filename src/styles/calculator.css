@@ -1,0 +1,521 @@
+/* Scientific Calculator Styles */
+
+.calculator-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.back-btn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.back-btn:hover {
+  background: white;
+  transform: translateX(-5px);
+}
+
+/* Sync Indicator */
+.sync-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #667eea;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.calculator-wrapper {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 20px;
+  max-width: 1000px;
+  width: 100%;
+}
+
+/* Main Calculator Section */
+.calculator-main {
+  background: white;
+  border-radius: 20px;
+  padding: 30px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  min-width: 400px;
+}
+
+.calculator-main h2 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 20px;
+  font-size: 24px;
+}
+
+/* Display Section */
+.calculator-display-section {
+  margin-bottom: 20px;
+}
+
+.memory-indicator {
+  height: 20px;
+  margin-bottom: 8px;
+}
+
+.memory-badge {
+  display: inline-block;
+  background: #ff6b6b;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.display {
+  position: relative;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.display-input {
+  flex: 1;
+  background: #f0f0f0;
+  border: 2px solid #667eea;
+  border-radius: 12px;
+  padding: 20px;
+  font-size: 28px;
+  text-align: right;
+  font-weight: 600;
+  color: #333;
+  font-family: 'Courier New', monospace;
+}
+
+.display-input:focus {
+  outline: none;
+  border-color: #764ba2;
+  background: #f8f8ff;
+}
+
+.copy-btn {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 12px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.3s ease;
+}
+
+.copy-btn:hover {
+  background: #764ba2;
+  transform: scale(1.1);
+}
+
+/* Angle Mode */
+.angle-mode {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.mode-btn {
+  padding: 8px 16px;
+  background: #f0f0f0;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 12px;
+  transition: all 0.3s ease;
+}
+
+.mode-btn.active {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.mode-btn:hover {
+  border-color: #667eea;
+}
+
+/* Button Grids */
+.button-grid {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+/* Memory Buttons */
+.memory-buttons {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.memory-buttons button {
+  padding: 10px;
+  background: #f39c12;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.memory-buttons button:hover {
+  background: #e67e22;
+  transform: scale(1.05);
+}
+
+/* Scientific Buttons */
+.scientific-buttons {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.scientific-buttons button {
+  padding: 12px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.scientific-buttons button:hover {
+  background: #2980b9;
+  transform: scale(1.05);
+}
+
+.scientific-buttons button.factorial {
+  background: #9b59b6;
+}
+
+.scientific-buttons button.factorial:hover {
+  background: #8e44ad;
+}
+
+/* Main Buttons */
+.main-buttons {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.main-buttons button {
+  padding: 18px;
+  font-size: 18px;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #ecf0f1;
+  color: #333;
+}
+
+.main-buttons button:hover {
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.main-buttons button.operator {
+  background: #667eea;
+  color: white;
+  font-weight: 700;
+}
+
+.main-buttons button.operator:hover {
+  background: #764ba2;
+}
+
+.main-buttons button.equals {
+  background: #2ecc71;
+  color: white;
+  grid-column: span 1;
+  font-size: 20px;
+}
+
+.main-buttons button.equals:hover {
+  background: #27ae60;
+}
+
+.main-buttons button.red {
+  background: #e74c3c;
+  color: white;
+}
+
+.main-buttons button.red:hover {
+  background: #c0392b;
+}
+
+.main-buttons button.orange {
+  background: #ff9800;
+  color: white;
+}
+
+.main-buttons button.orange:hover {
+  background: #f57c00;
+}
+
+.main-buttons button.wide-btn {
+  grid-column: span 1;
+}
+
+.main-buttons button.zero-btn {
+  grid-column: span 1;
+}
+
+/* History Sidebar */
+.calculator-history {
+  background: white;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 250px;
+  height: fit-content;
+  max-height: 600px;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 10px;
+}
+
+.history-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 16px;
+}
+
+.clear-history-btn {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.clear-history-btn:hover {
+  background: #c0392b;
+  transform: scale(1.1);
+}
+
+/* History List */
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empty-history {
+  text-align: center;
+  color: #999;
+  padding: 20px 10px;
+  font-size: 14px;
+}
+
+.history-item {
+  background: #f9f9f9;
+  padding: 10px;
+  border-radius: 8px;
+  border-left: 3px solid #667eea;
+  font-size: 12px;
+  color: #555;
+  word-break: break-all;
+  max-height: 60px;
+  overflow-y: auto;
+}
+
+.history-item:hover {
+  background: #f0f0f0;
+}
+
+.history-item span {
+  font-family: 'Courier New', monospace;
+}
+
+/* Scrollbar Styling */
+.history-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.history-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.history-list::-webkit-scrollbar-thumb {
+  background: #667eea;
+  border-radius: 10px;
+}
+
+.history-list::-webkit-scrollbar-thumb:hover {
+  background: #764ba2;
+}
+
+/* History Delete Button */
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-delete-btn {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.history-delete-btn:hover {
+  background: #c0392b;
+  transform: scale(1.05);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .calculator-wrapper {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .calculator-main {
+    min-width: 100%;
+    padding: 20px;
+  }
+
+  .calculator-history {
+    width: 100%;
+    max-height: 300px;
+  }
+
+  .main-buttons {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .scientific-buttons {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .back-btn {
+    position: static;
+    margin-bottom: 15px;
+    width: 100%;
+  }
+
+  .calculator-container {
+    padding: 10px;
+  }
+
+  .calculator-main h2 {
+    font-size: 20px;
+  }
+
+  .display-input {
+    font-size: 24px;
+    padding: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .calculator-wrapper {
+    grid-template-columns: 1fr;
+  }
+
+  .calculator-main {
+    min-width: 100%;
+    padding: 15px;
+  }
+
+  .main-buttons {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .scientific-buttons {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .memory-buttons {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .main-buttons button {
+    padding: 14px;
+    font-size: 16px;
+  }
+
+  .scientific-buttons button {
+    font-size: 11px;
+    padding: 10px;
+  }
+
+  .display-input {
+    font-size: 20px;
+    padding: 12px;
+  }
+
+  .calculator-main h2 {
+    font-size: 18px;
+    margin-bottom: 15px;
+  }
+
+  .calculator-history {
+    max-height: 250px;
+  }
+}

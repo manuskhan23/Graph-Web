@@ -281,7 +281,7 @@ function SportsGraph({ user, onBack }) {
                     className="remove-btn"
                     onClick={() => handleRemoveInput(index)}
                   >
-                    ✕
+                    Remove
                   </button>
                 )}
               </div>

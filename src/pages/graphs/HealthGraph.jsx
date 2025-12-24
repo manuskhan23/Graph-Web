@@ -303,9 +303,9 @@ function HealthGraph({ user, onBack }) {
                   <button
                     className="remove-btn"
                     onClick={() => handleRemoveInput(index)}
-                  >
-                    ✕
-                  </button>
+                    >
+                     Remove
+                    </button>
                 )}
               </div>
             ))}

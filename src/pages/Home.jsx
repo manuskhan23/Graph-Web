@@ -92,7 +92,7 @@ function Home({ onSelectCategory }) {
             >
               <h3>{cat.name}</h3>
               <p>{cat.description}</p>
-              <button className="explore-btn">Explore →</button>
+              <button className="explore-btn">Explore</button>
             </div>
           </div>
         ))}

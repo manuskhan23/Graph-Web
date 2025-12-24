@@ -282,12 +282,12 @@ function BusinessGraph({ user, onBack }) {
       <button className="back-btn" onClick={onBack}>← Back to Home</button>
       
       <div className="category-header" style={{ borderLeft: '5px solid #FF6B6B' }}>
-        <h1>📊 Business Graphs</h1>
+        <h1>Business Graphs</h1>
         <p>Track financial performance and growth</p>
       </div>
 
       <button className="create-btn" onClick={() => setShowForm(!showForm)}>
-        {showForm ? '✕ Close Form' : '➕ Create New Graph'}
+        {showForm ? 'Close Form' : 'Create New Graph'}
       </button>
 
       {showForm && (
@@ -338,13 +338,13 @@ function BusinessGraph({ user, onBack }) {
                   onChange={(e) => handleInputChange(index, 'revenue', e.target.value)}
                 />
                 {formData.length > 1 && (
-                  <button 
-                    className="remove-btn" 
-                    onClick={() => handleRemoveInput(index)}
-                  >
-                    ✕
-                  </button>
-                )}
+                   <button 
+                     className="remove-btn" 
+                     onClick={() => handleRemoveInput(index)}
+                   >
+                     Remove
+                   </button>
+                 )}
               </div>
             ))}
             <button className="add-more-btn" onClick={handleAddMore}>
@@ -369,7 +369,7 @@ function BusinessGraph({ user, onBack }) {
 
       {preview && (
         <div className="preview-section" id="preview-section">
-          <h2>📊 Preview</h2>
+          <h2>Preview</h2>
           <div className="graph-display">
             <Graph type={chartType} title={reportName} data={preview} />
           </div>

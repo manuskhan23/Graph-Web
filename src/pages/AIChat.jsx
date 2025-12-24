@@ -264,7 +264,7 @@ function AIChat({ user, onBack }) {
                       onKeyPress={(e) => e.key === 'Enter' && handleRenameChat(chat.id)}
                       autoFocus
                     />
-                    <button onClick={() => handleRenameChat(chat.id)}>✓</button>
+                    <button onClick={() => handleRenameChat(chat.id)}>Save</button>
                   </div>
                 ) : (
                   <>
@@ -283,13 +283,13 @@ function AIChat({ user, onBack }) {
                           setRenameValue(chat.name);
                         }}
                       >
-                        ✎
+                        Edit
                       </button>
                       <button
                         className="action-btn delete"
                         onClick={() => handleDeleteChat(chat.id)}
                       >
-                        ✕
+                        Delete
                       </button>
                     </div>
                   </>

@@ -243,9 +243,9 @@ function EducationGraph({ user, onBack }) {
                   <button 
                     className="remove-btn" 
                     onClick={() => handleRemoveInput(index)}
-                  >
-                    ✕
-                  </button>
+                    >
+                     Remove
+                    </button>
                 )}
               </div>
             ))}
@@ -313,7 +313,7 @@ function EducationGraph({ user, onBack }) {
         <div className="preview-section">
           <div className="preview-header">
             <h2>{graphs[viewingGraphId].name}</h2>
-            <button className="close-btn" onClick={() => setViewingGraphId(null)}>✕</button>
+            <button className="close-btn" onClick={() => setViewingGraphId(null)}>Close</button>
           </div>
           <Graph 
             type={graphs[viewingGraphId].type} 

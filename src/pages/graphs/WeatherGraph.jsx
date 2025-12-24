@@ -299,13 +299,13 @@ function WeatherGraph({ user, onBack }) {
                   step="0.1"
                 />
                 {formData.length > 1 && (
-                  <button
-                    className="remove-btn"
-                    onClick={() => handleRemoveInput(index)}
-                  >
-                    ✕
-                  </button>
-                )}
+                   <button
+                     className="remove-btn"
+                     onClick={() => handleRemoveInput(index)}
+                   >
+                     Remove
+                   </button>
+                 )}
               </div>
             ))}
             <button className="add-more-btn" onClick={handleAddMore}>

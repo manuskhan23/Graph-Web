@@ -4,6 +4,7 @@ import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
 import Home from './pages/Home.jsx';
 import AIChat from './pages/AIChat.jsx';
+import ScientificCalculator from './pages/ScientificCalculator.jsx';
 import BusinessGraph from './pages/graphs/BusinessGraph.jsx';
 import EducationGraph from './pages/graphs/EducationGraph.jsx';
 import SportsGraph from './pages/graphs/SportsGraph.jsx';
@@ -157,6 +158,10 @@ function App() {
           <AIChat user={user} onBack={() => setCurrentPage('home')} />
         )}
 
+        {user && currentPage === 'calculator' && (
+          <ScientificCalculator onBack={() => setCurrentPage('home')} />
+        )}
+
         {user && currentPage === 'survey-form' && (
           <SurveyForm onBack={() => setCurrentPage('home')} />
         )}
@@ -177,7 +182,7 @@ function App() {
           <AdminManager onBack={() => setCurrentPage('home')} />
         )}
 
-        {user && !['home', 'ai-chat', 'survey-form', 'category', 'survey-graph', 'admin-dashboard', 'admin-manager'].includes(currentPage) && (
+        {user && !['home', 'ai-chat', 'calculator', 'survey-form', 'category', 'survey-graph', 'admin-dashboard', 'admin-manager'].includes(currentPage) && (
           <div style={{
             padding: '40px 20px',
             textAlign: 'center',

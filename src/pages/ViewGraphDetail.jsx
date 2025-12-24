@@ -155,9 +155,9 @@ function ViewGraphDetail({ user, categoryType, graphId, onBack }) {
           <div className="form-group">
             <label>Chart Type *</label>
             <select value={editedType} onChange={(e) => setEditedType(e.target.value)}>
-              <option value="line">📈 Line Chart</option>
-              <option value="bar">📊 Bar Chart</option>
-              <option value="pie">🥧 Pie Chart</option>
+              <option value="line">Line Chart</option>
+              <option value="bar">Bar Chart</option>
+              <option value="pie">Pie Chart</option>
             </select>
           </div>
 

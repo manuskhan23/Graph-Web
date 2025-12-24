@@ -18,16 +18,16 @@ CORS(app, origins=[
     "*"
 ])
 
-print("\n[●] Starting MyGraph AI Backend Server")
+print("\n[START] Starting MyGraph AI Backend Server")
 print("=" * 50)
 
 # Get API key from environment
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 
 if GROQ_API_KEY:
-    print(f"[✓] GROQ_API_KEY found: {GROQ_API_KEY[:20]}...")
+    print(f"[OK] GROQ_API_KEY found: {GROQ_API_KEY[:20]}...")
 else:
-    print("[✗] GROQ_API_KEY not found!")
+    print("[ERROR] GROQ_API_KEY not found!")
     print("Make sure .env file has: GROQ_API_KEY=your_key")
 
 @app.route('/api/chat', methods=['POST', 'OPTIONS'])
@@ -51,7 +51,7 @@ def chat():
         
         # Use REST API directly (no SDK compatibility issues)
         try:
-            print(f"[→] Sending message to Groq: {user_message[:50]}...")
+            print(f"[REQUEST] Sending message to Groq: {user_message[:50]}...")
             
             # Call Groq API via REST
             url = "https://api.groq.com/openai/v1/chat/completions"
@@ -73,7 +73,7 @@ def chat():
             if response.status_code == 200:
                 result = response.json()
                 ai_response = result['choices'][0]['message']['content']
-                print(f"[✓] Got response from Groq")
+                print(f"[OK] Got response from Groq")
                 
                 return jsonify({
                     'success': True,
@@ -82,7 +82,7 @@ def chat():
                 })
             else:
                 error_msg = response.text
-                print(f"[✗] Groq API error: {error_msg}")
+                print(f"[ERROR] Groq API error: {error_msg}")
                 return jsonify({
                     'success': False,
                     'error': f'Groq API Error: {error_msg}'
@@ -90,14 +90,14 @@ def chat():
             
         except Exception as e:
             error_msg = str(e)
-            print(f"[✗] Groq API error: {error_msg}")
+            print(f"[ERROR] Groq API error: {error_msg}")
             return jsonify({
                 'success': False,
                 'error': f'Groq API Error: {error_msg}'
             }), 500
     
     except Exception as e:
-        print(f"[✗] Error in chat endpoint: {str(e)}")
+        print(f"[ERROR] Error in chat endpoint: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -123,7 +123,7 @@ def index():
 
 if __name__ == '__main__':
     print("=" * 50)
-    print("[•] Using Groq API (Free & Fast)")
-    print("[•] Frontend on http://localhost:5173")
-    print("[•] Backend on http://localhost:5000\n")
+    print("[INFO] Using Groq API (Free & Fast)")
+    print("[INFO] Frontend on http://localhost:5173")
+    print("[INFO] Backend on http://localhost:5000\n")
     app.run(debug=True, port=5000, host='0.0.0.0')

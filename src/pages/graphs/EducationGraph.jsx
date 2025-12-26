@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
-import { getUserGraphs, saveGraphData, database } from '../../firebase';
+import { getUserGraphs, saveGraphData, graphNameExists, database } from '../../firebase';
 import { ref, remove } from 'firebase/database';
 import Graph from '../../components/Graph';
 
@@ -102,6 +102,14 @@ function EducationGraph({ user, onBack }) {
     setError('');
 
     try {
+      // Check if graph name already exists
+      const nameExists = await graphNameExists(user.uid, 'education', reportName);
+      if (nameExists) {
+        setError(`[!] A graph with the name "${reportName}" already exists. Please choose a different name.`);
+        setSaving(false);
+        return;
+      }
+
       const graphData = {
         labels: preview.labels,
         data: preview.datasets,

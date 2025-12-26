@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { saveGraphData } from '../firebase';
+import { saveGraphData, graphNameExists } from '../firebase';
 import Graph from '../components/Graph';
 
 function CreateGraphForm({ user, categoryType, onBack }) {
@@ -71,6 +71,14 @@ function CreateGraphForm({ user, categoryType, onBack }) {
     setError('');
 
     try {
+      // Check if graph name already exists
+      const nameExists = await graphNameExists(user.uid, categoryType, graphName);
+      if (nameExists) {
+        setError(`[✗] A graph with the name "${graphName}" already exists. Please choose a different name.`);
+        setSaving(false);
+        return;
+      }
+
       const graphData = {
         labels: preview.labels,
         data: preview.datasets[0].data,

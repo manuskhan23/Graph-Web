@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
-import { getUserGraphs, saveGraphData, updateGraphData, database, set, ref } from '../../firebase';
+import { getUserGraphs, saveGraphData, updateGraphData, graphNameExists, database, set, ref } from '../../firebase';
 import { remove } from 'firebase/database';
 import Graph from '../../components/Graph';
 
@@ -150,6 +150,14 @@ function BusinessGraph({ user, onBack }) {
         });
         setEditGraphId(null);
       } else {
+        // Check if graph name already exists (only for new graphs)
+        const nameExists = await graphNameExists(user.uid, 'business', reportName);
+        if (nameExists) {
+          setError(`⚠️ A graph with the name "${reportName}" already exists. Please choose a different name.`);
+          setSaving(false);
+          return;
+        }
+
         // Save new graph
         await saveGraphData(user.uid, 'business', reportName, graphData);
         Swal.fire({

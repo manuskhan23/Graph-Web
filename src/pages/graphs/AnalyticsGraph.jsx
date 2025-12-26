@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getUserGraphs, saveGraphData, updateGraphData, database } from '../../firebase';
+import { getUserGraphs, saveGraphData, updateGraphData, graphNameExists, database } from '../../firebase';
 import { ref, remove } from 'firebase/database';
 import Graph from '../../components/Graph';
 
@@ -137,6 +137,14 @@ function AnalyticsGraph({ user, onBack }) {
         alert('✅ Analytics report updated!');
         setEditGraphId(null);
       } else {
+        // Check if graph name already exists (only for new graphs)
+        const nameExists = await graphNameExists(user.uid, 'analytics', reportName);
+        if (nameExists) {
+          setError(`⚠️ A graph with the name "${reportName}" already exists. Please choose a different name.`);
+          setSaving(false);
+          return;
+        }
+
         // Save new graph
         await saveGraphData(user.uid, 'analytics', reportName, graphData);
         alert('✅ Analytics report saved!');

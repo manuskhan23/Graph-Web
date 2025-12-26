@@ -164,6 +164,28 @@ export async function getUserGraphs(uid, graphType) {
   }
 }
 
+// ✅ Check if graph name already exists in a category
+export async function graphNameExists(uid, graphType, graphName) {
+  try {
+    const graphs = await getUserGraphs(uid, graphType);
+    if (!graphs || Object.keys(graphs).length === 0) {
+      return false;
+    }
+    
+    // Check if any graph has the same name (case-insensitive)
+    const normalizedName = graphName.toLowerCase().trim();
+    for (const graphId in graphs) {
+      if (graphs[graphId].name && graphs[graphId].name.toLowerCase().trim() === normalizedName) {
+        return true;
+      }
+    }
+    return false;
+  } catch (error) {
+    console.error('Error checking graph name:', error);
+    throw error;
+  }
+}
+
 // ✅ Get single graph
 export async function getGraph(uid, graphType, graphId) {
   try {

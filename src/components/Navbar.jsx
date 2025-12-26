@@ -75,13 +75,13 @@ function Navbar({ onLogout, onPageChange, currentPage }) {
           <span className="navbar-toggler-icon"></span>
         </button>
         <div className="collapse navbar-collapse" id="navbarNav">
-          <div className="navbar-nav ms-auto gap-2">
-            <button
-              className={`nav-link ${currentPage === 'home' ? 'active' : ''}`}
-              onClick={() => onPageChange('home')}
-            >
-              Home
-            </button>
+           <div className="navbar-nav ms-auto gap-2">
+             <button
+               className={`nav-link ${currentPage === 'home' ? 'active' : ''}`}
+               onClick={() => onPageChange('home')}
+             >
+               Home
+             </button>
             <button
               className={`nav-link ${currentPage === 'ai-chat' ? 'active' : ''}`}
               onClick={() => onPageChange('ai-chat')}

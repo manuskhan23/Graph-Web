@@ -35,9 +35,43 @@ function AdminDashboard({ onBack }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [deletingId, setDeletingId] = useState(null);
   const [currentUserRole, setCurrentUserRole] = useState(null);
+  
+  // UI/UX Improvements
+  const [studentSearchTerm, setStudentSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState("name"); // name, submissions, class
+  const [expandedStudent, setExpandedStudent] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const responsesPerPage = 10;
+
+  // Widget Customization
+  const [visibleWidgets, setVisibleWidgets] = useState(() => {
+    const saved = localStorage.getItem("adminWidgets");
+    return saved
+      ? JSON.parse(saved)
+      : {
+          platformBar: true,
+          platformLine: true,
+          platformPie: true,
+          timeBar: true,
+          timeLine: true,
+          timePie: true,
+        };
+  });
 
   const mainAdminEmail = "anus2580@gmail.com";
   const currentUser = getCurrentUser();
+
+  // Save widget preferences
+  useEffect(() => {
+    localStorage.setItem("adminWidgets", JSON.stringify(visibleWidgets));
+  }, [visibleWidgets]);
+
+  const toggleWidget = (widgetName) => {
+    setVisibleWidgets((prev) => ({
+      ...prev,
+      [widgetName]: !prev[widgetName],
+    }));
+  };
 
   useEffect(() => {
     const surveysRef = ref(surveyDatabase, "surveys");
@@ -260,6 +294,12 @@ function AdminDashboard({ onBack }) {
           Dashboard
         </button>
         <button
+          className={`admin-nav-btn ${view === "unique-students" ? "active" : ""}`}
+          onClick={() => setView("unique-students")}
+        >
+          Unique Students ({stats.uniqueStudents})
+        </button>
+        <button
           className={`admin-nav-btn ${view === "responses" ? "active" : ""}`}
           onClick={() => setView("responses")}
         >
@@ -272,7 +312,7 @@ function AdminDashboard({ onBack }) {
             }`}
             onClick={() => setView("manage-admins")}
           >
-            👥 Manage Admins
+            Manage Admins
           </button>
         )}
       </div>
@@ -280,6 +320,61 @@ function AdminDashboard({ onBack }) {
       {/* Dashboard View */}
       {view === "dashboard" && (
         <div className="admin-dashboard">
+          {/* Widget Customization Controls */}
+          <div className="widget-customization">
+            <h3>📊 Customize Dashboard</h3>
+            <div className="widget-toggles">
+              <label className="widget-toggle">
+                <input
+                  type="checkbox"
+                  checked={visibleWidgets.platformBar}
+                  onChange={() => toggleWidget("platformBar")}
+                />
+                Platform Bar Chart
+              </label>
+              <label className="widget-toggle">
+                <input
+                  type="checkbox"
+                  checked={visibleWidgets.platformLine}
+                  onChange={() => toggleWidget("platformLine")}
+                />
+                Platform Line Chart
+              </label>
+              <label className="widget-toggle">
+                <input
+                  type="checkbox"
+                  checked={visibleWidgets.platformPie}
+                  onChange={() => toggleWidget("platformPie")}
+                />
+                Platform Pie Chart
+              </label>
+              <label className="widget-toggle">
+                <input
+                  type="checkbox"
+                  checked={visibleWidgets.timeBar}
+                  onChange={() => toggleWidget("timeBar")}
+                />
+                Time Spent Bar Chart
+              </label>
+              <label className="widget-toggle">
+                <input
+                  type="checkbox"
+                  checked={visibleWidgets.timeLine}
+                  onChange={() => toggleWidget("timeLine")}
+                />
+                Time Spent Line Chart
+              </label>
+              <label className="widget-toggle">
+                <input
+                  type="checkbox"
+                  checked={visibleWidgets.timePie}
+                  onChange={() => toggleWidget("timePie")}
+                />
+                Time Spent Pie Chart
+              </label>
+            </div>
+          </div>
+
           <div className="stats-grid">
             <div className="stat-card">
               <div className="stat-icon">📝</div>
@@ -329,6 +424,7 @@ function AdminDashboard({ onBack }) {
           <div className="admin-breakdown">
             {/* Platform Usage Charts */}
             <div className="charts-container">
+              {visibleWidgets.platformBar && (
               <div className="chart-section">
                 <h3>Platform Usage - Bar Chart</h3>
                 <Bar
@@ -365,12 +461,14 @@ function AdminDashboard({ onBack }) {
                       },
                     },
                   }}
-                />
-              </div>
+                  />
+                  </div>
+                  )}
 
-              <div className="chart-section">
-                <h3>Platform Usage - Line Chart</h3>
-                <Line
+                  {visibleWidgets.platformLine && (
+                  <div className="chart-section">
+                  <h3>Platform Usage - Line Chart</h3>
+                  <Line
                   data={{
                     labels: Object.keys(stats.platforms),
                     datasets: [
@@ -407,12 +505,14 @@ function AdminDashboard({ onBack }) {
                       },
                     },
                   }}
-                />
-              </div>
+                  />
+                  </div>
+                  )}
 
-              <div className="chart-section">
-                <h3>Platform Usage - Pie Chart</h3>
-                <Pie
+                  {visibleWidgets.platformPie && (
+                  <div className="chart-section">
+                  <h3>Platform Usage - Pie Chart</h3>
+                  <Pie
                   data={{
                     labels: Object.keys(stats.platforms),
                     datasets: [
@@ -435,15 +535,17 @@ function AdminDashboard({ onBack }) {
                       },
                     },
                   }}
-                />
-              </div>
-            </div>
+                  />
+                  </div>
+                  )}
+                  </div>
 
-            {/* Time Spent Charts */}
-            <div className="charts-container">
-              <div className="chart-section">
-                <h3>Daily Time Spent - Bar Chart</h3>
-                <Bar
+                  {/* Time Spent Charts */}
+                  <div className="charts-container">
+                  {visibleWidgets.timeBar && (
+                  <div className="chart-section">
+                  <h3>Daily Time Spent - Bar Chart</h3>
+                  <Bar
                   data={{
                     labels: Object.keys(stats.timeSpent),
                     datasets: [
@@ -474,12 +576,14 @@ function AdminDashboard({ onBack }) {
                       },
                     },
                   }}
-                />
-              </div>
+                  />
+                  </div>
+                  )}
 
-              <div className="chart-section">
-                <h3>Daily Time Spent - Line Chart</h3>
-                <Line
+                  {visibleWidgets.timeLine && (
+                  <div className="chart-section">
+                  <h3>Daily Time Spent - Line Chart</h3>
+                  <Line
                   data={{
                     labels: Object.keys(stats.timeSpent),
                     datasets: [
@@ -516,12 +620,14 @@ function AdminDashboard({ onBack }) {
                       },
                     },
                   }}
-                />
-              </div>
+                  />
+                  </div>
+                  )}
 
-              <div className="chart-section">
-                <h3>Daily Time Spent - Pie Chart</h3>
-                <Pie
+                  {visibleWidgets.timePie && (
+                  <div className="chart-section">
+                  <h3>Daily Time Spent - Pie Chart</h3>
+                  <Pie
                   data={{
                     labels: Object.keys(stats.timeSpent),
                     datasets: [
@@ -544,10 +650,166 @@ function AdminDashboard({ onBack }) {
                       },
                     },
                   }}
-                />
-              </div>
-            </div>
+                  />
+                  </div>
+                  )}
+                  </div>
+                  </div>
+                  </div>
+                  )}
+
+      {/* Unique Students View */}
+      {view === "unique-students" && (
+        <div className="admin-unique-students">
+          <div className="unique-students-header">
+            <h2>Unique Students List</h2>
+            <p>Total: {stats.uniqueStudents} unique students</p>
           </div>
+
+          {stats.uniqueStudents === 0 ? (
+            <div className="no-data">
+              <p>No students found</p>
+            </div>
+          ) : (
+            <>
+              {/* Search and Filter Controls */}
+              <div className="students-controls">
+                <div className="search-filter-group">
+                  <input
+                    type="text"
+                    placeholder="Search students by name, class, section..."
+                    className="search-input"
+                    value={studentSearchTerm}
+                    onChange={(e) => {
+                      setStudentSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                  />
+                  <select
+                    className="sort-select"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                  >
+                    <option value="name">Sort by Name (A-Z)</option>
+                    <option value="submissions">Sort by Submissions (High to Low)</option>
+                    <option value="class">Sort by Class</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Students List */}
+              <div className="unique-students-list">
+                {Array.from(new Set(surveys.map((s) => s.name)))
+                  .map((studentName) => {
+                    const studentSurveys = surveys.filter((s) => s.name === studentName);
+                    const submissionCount = studentSurveys.length;
+                    const latestSubmission = studentSurveys[0];
+                    return {
+                      name: studentName,
+                      surveys: studentSurveys,
+                      count: submissionCount,
+                      latest: latestSubmission,
+                      class: latestSubmission.class,
+                    };
+                  })
+                  // Filter students
+                  .filter((student) => {
+                    const search = studentSearchTerm.toLowerCase();
+                    return (
+                      student.name.toLowerCase().includes(search) ||
+                      student.class.toLowerCase().includes(search) ||
+                      student.latest.section.toLowerCase().includes(search)
+                    );
+                  })
+                  // Sort students
+                  .sort((a, b) => {
+                    if (sortBy === "name") {
+                      return a.name.localeCompare(b.name);
+                    } else if (sortBy === "submissions") {
+                      return b.count - a.count;
+                    } else if (sortBy === "class") {
+                      return a.class.localeCompare(b.class);
+                    }
+                    return 0;
+                  })
+                  .map((student, index) => (
+                    <div key={index} className="student-card">
+                      <div
+                        className="student-card-header"
+                        onClick={() =>
+                          setExpandedStudent(expandedStudent === student.name ? null : student.name)
+                        }
+                        style={{ cursor: "pointer" }}
+                      >
+                        <div className="student-info">
+                          <h3>{student.name}</h3>
+                          <p className="student-meta">
+                            Father Name: <span>{student.latest.fatherName}</span>
+                          </p>
+                          <p className="student-meta">
+                            Class: <span>{student.class}</span> | Section: <span>{student.latest.section}</span>
+                          </p>
+                        </div>
+                        <div className="student-card-actions">
+                          <button
+                            className="student-delete-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`Delete all submissions for ${student.name}? This cannot be undone.`)) {
+                                student.surveys.forEach((survey) => {
+                                  const surveyRef = ref(surveyDatabase, `surveys/${survey.id}`);
+                                  remove(surveyRef);
+                                });
+                              }
+                            }}
+                            title="Delete all submissions for this student"
+                          >
+                            Delete
+                          </button>
+                          <span className="expand-icon">
+                            {expandedStudent === student.name ? "▼" : "▶"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="student-stats">
+                        <div className="stat">
+                          <span className="stat-label">Submissions:</span>
+                          <span className="stat-val">{student.count}</span>
+                        </div>
+                        <div className="stat">
+                          <span className="stat-label">Last Submitted:</span>
+                          <span className="stat-val">
+                            {new Date(student.latest.timestamp).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Student Detail View */}
+                      {expandedStudent === student.name && (
+                        <div className="student-detail">
+                          <h4>All Submissions</h4>
+                          <div className="submissions-list">
+                            {student.surveys.map((submission, idx) => (
+                              <div key={idx} className="submission-item">
+                                <span className="submission-date">
+                                  {new Date(submission.timestamp).toLocaleString()}
+                                </span>
+                                <span className="submission-platform">
+                                  {Array.isArray(submission.platforms)
+                                    ? submission.platforms.join(", ")
+                                    : submission.platforms}
+                                </span>
+                                <span className="submission-time">{submission.timeSpent}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -560,7 +822,10 @@ function AdminDashboard({ onBack }) {
               placeholder="Search by name, father name, class, or section..."
               className="search-input"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
             />
           </div>
 
@@ -569,69 +834,108 @@ function AdminDashboard({ onBack }) {
               <p>No survey responses found</p>
             </div>
           ) : (
-            <div className="responses-table-wrapper">
-              <table className="responses-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Father Name</th>
-                    <th>Class</th>
-                    <th>Section</th>
-                    <th>Platform</th>
-                    <th>Time Spent</th>
-                    <th>Submitted</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSurveys.map((survey) => (
-                    <tr key={survey.id}>
-                      <td>{survey.name}</td>
-                      <td>{survey.fatherName}</td>
-                      <td>{survey.class}</td>
-                      <td>{survey.section}</td>
-                      <td>
-                        {Array.isArray(survey.platforms) ? (
-                          <>
-                            {survey.platforms.map((platform, idx) => (
-                              <span key={idx} className="platform-badge">
-                                {platform}
-                              </span>
-                            ))}
-                          </>
-                        ) : (
-                          <span className="platform-badge">
-                            {survey.platform}
-                          </span>
-                        )}
-                        {survey.platformOther && (
-                          <span className="platform-badge-other">
-                            {survey.platformOther}
-                          </span>
-                        )}
-                      </td>
-                      <td>{survey.timeSpent}</td>
-                      <td className="timestamp">
-                        {new Date(survey.timestamp).toLocaleDateString()}
-                        <br />
-                        <small>
-                          {new Date(survey.timestamp).toLocaleTimeString()}
-                        </small>
-                      </td>
-                      <td>
-                        <button
-                          className="btn-delete"
-                          onClick={() => handleDeleteResponse(survey.id)}
-                          disabled={deletingId === survey.id}
-                        >
-                          {deletingId === survey.id ? "Deleting..." : "Delete"}
-                        </button>
-                      </td>
+            <>
+              <div className="responses-table-wrapper">
+                <table className="responses-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Father Name</th>
+                      <th>Class</th>
+                      <th>Section</th>
+                      <th>Platform</th>
+                      <th>Time Spent</th>
+                      <th>Submitted</th>
+                      <th>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {filteredSurveys
+                      .slice(
+                        (currentPage - 1) * responsesPerPage,
+                        currentPage * responsesPerPage
+                      )
+                      .map((survey) => (
+                        <tr key={survey.id}>
+                          <td>{survey.name}</td>
+                          <td>{survey.fatherName}</td>
+                          <td>{survey.class}</td>
+                          <td>{survey.section}</td>
+                          <td>
+                            {Array.isArray(survey.platforms) ? (
+                              <>
+                                {survey.platforms.map((platform, idx) => (
+                                  <span key={idx} className="platform-badge">
+                                    {platform}
+                                  </span>
+                                ))}
+                              </>
+                            ) : (
+                              <span className="platform-badge">
+                                {survey.platform}
+                              </span>
+                            )}
+                            {survey.platformOther && (
+                              <span className="platform-badge-other">
+                                {survey.platformOther}
+                              </span>
+                            )}
+                          </td>
+                          <td>{survey.timeSpent}</td>
+                          <td className="timestamp">
+                            {new Date(survey.timestamp).toLocaleDateString()}
+                            <br />
+                            <small>
+                              {new Date(survey.timestamp).toLocaleTimeString()}
+                            </small>
+                          </td>
+                          <td>
+                            <button
+                              className="btn-delete"
+                              onClick={() => handleDeleteResponse(survey.id)}
+                              disabled={deletingId === survey.id}
+                            >
+                              {deletingId === survey.id ? "Deleting..." : "Delete"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Controls */}
+              <div className="pagination-controls">
+                <button
+                  className="btn-pagination"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  ← Previous
+                </button>
+                <span className="pagination-info">
+                  Page {currentPage} of{" "}
+                  {Math.ceil(filteredSurveys.length / responsesPerPage)}
+                </span>
+                <button
+                  className="btn-pagination"
+                  onClick={() =>
+                    setCurrentPage((prev) =>
+                      Math.min(
+                        Math.ceil(filteredSurveys.length / responsesPerPage),
+                        prev + 1
+                      )
+                    )
+                  }
+                  disabled={
+                    currentPage ===
+                    Math.ceil(filteredSurveys.length / responsesPerPage)
+                  }
+                >
+                  Next →
+                </button>
+              </div>
+            </>
           )}
         </div>
       )}

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { login } from '../firebase';
 
 function Login({ onSignupClick, onLoginSuccess }) {
@@ -22,50 +23,113 @@ function Login({ onSignupClick, onLoginSuccess }) {
     }
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0, scale: 0.9 },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      transition: { duration: 0.5 },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { y: 10, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: { duration: 0.4 },
+    },
+  };
+
   return (
-    <div className="auth-container">
-      <div className="auth-box">
-        <h1>MyGraph</h1>
-        <h2>Login</h2>
+    <motion.div 
+      className="auth-container"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
+      <motion.div 
+        className="auth-box"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <motion.h1
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.6 }}
+        >
+          MyGraph
+        </motion.h1>
+        <motion.h2 variants={itemVariants}>Login</motion.h2>
         
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Email</label>
-            <input
+        <motion.form 
+          onSubmit={handleSubmit}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ staggerChildren: 0.1, delayChildren: 0.2 }}
+        >
+          <motion.div className="form-group" variants={itemVariants}>
+            <motion.label variants={itemVariants}>Email</motion.label>
+            <motion.input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target. value)}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email"
               required
+              whileFocus={{ scale: 1.02, boxShadow: '0 0 10px rgba(102, 126, 234, 0.5)' }}
+              variants={itemVariants}
             />
-          </div>
+          </motion.div>
 
-          <div className="form-group">
-            <label>Password</label>
-            <input
+          <motion.div className="form-group" variants={itemVariants}>
+            <motion.label variants={itemVariants}>Password</motion.label>
+            <motion.input
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target. value)}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
               required
+              whileFocus={{ scale: 1.02, boxShadow: '0 0 10px rgba(102, 126, 234, 0.5)' }}
+              variants={itemVariants}
             />
-          </div>
+          </motion.div>
 
-          {error && <div className="error">{error}</div>}
+          {error && (
+            <motion.div 
+              className="error"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              {error}
+            </motion.div>
+          )}
 
-          <button type="submit" disabled={loading}>
+          <motion.button 
+            type="submit" 
+            disabled={loading}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            variants={itemVariants}
+          >
             {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
+          </motion.button>
+        </motion.form>
 
-        <p>
+        <motion.p variants={itemVariants}>
           Don't have an account? {' '}
-          <button className="link-btn" onClick={onSignupClick}>
+          <motion.button 
+            className="link-btn" 
+            onClick={onSignupClick}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
             Sign Up
-          </button>
-        </p>
-      </div>
-    </div>
+          </motion.button>
+        </motion.p>
+      </motion.div>
+    </motion.div>
   );
 }
 

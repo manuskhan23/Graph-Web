@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { ref, onValue, push, remove, update } from 'firebase/database';
 import { surveyDatabase } from './surveyFirebase';
 import { getCurrentUser } from '../src/firebase';

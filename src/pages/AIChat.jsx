@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { sendMessage } from '../services/aiService';
 import { createChat, getUserChats, getChat, saveMessageToChat, deleteChat, updateChatName } from '../firebase';
@@ -200,13 +201,7 @@ function AIChat({ user, onBack }) {
     }
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -220,99 +215,191 @@ function AIChat({ user, onBack }) {
   const currentChatName = currentChat ? currentChat.name : 'New Chat';
 
   return (
-    <div className="aichat-full-container">
+    <motion.div 
+      className="aichat-full-container"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+    >
       {/* Sidebar */}
-      <aside className="aichat-sidebar">
-        <div className="sidebar-header">
+      <motion.aside 
+        className="aichat-sidebar"
+        initial={{ x: -100, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        <motion.div 
+          className="sidebar-header"
+          initial={{ y: -10, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.2 }}
+        >
           <h3>Chats</h3>
-          <button className="new-chat-btn" onClick={() => setShowNewChat(!showNewChat)}>
+          <motion.button 
+            className="new-chat-btn" 
+            onClick={() => setShowNewChat(!showNewChat)}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+          >
             +
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
 
         {showNewChat && (
-          <div className="new-chat-form">
-            <input
+          <motion.div 
+            className="new-chat-form"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <motion.input
               type="text"
               placeholder="Chat name..."
               value={newChatName}
               onChange={(e) => setNewChatName(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleCreateNewChat()}
+              whileFocus={{ scale: 1.02 }}
             />
-            <button onClick={handleCreateNewChat}>Create</button>
-            <button onClick={() => setShowNewChat(false)}>Cancel</button>
-          </div>
+            <motion.button 
+              onClick={handleCreateNewChat}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Create
+            </motion.button>
+            <motion.button 
+              onClick={() => setShowNewChat(false)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Cancel
+            </motion.button>
+          </motion.div>
         )}
 
-        <div className="chat-list">
+        <motion.div 
+          className="chat-list"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ staggerChildren: 0.05 }}
+        >
           {loadingChats ? (
             <p className="loading">Loading...</p>
           ) : chats.length === 0 ? (
             <p className="no-chats">No chats</p>
           ) : (
             chats.map((chat) => (
-              <div
+              <motion.div
                 key={chat.id}
                 className={`chat-item ${currentChatId === chat.id ? 'active' : ''}`}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                whileHover={{ x: 5 }}
               >
                 {renamingChatId === chat.id ? (
-                  <div className="rename-input">
-                    <input
+                  <motion.div 
+                    className="rename-input"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                  >
+                    <motion.input
                       type="text"
                       value={renameValue}
                       onChange={(e) => setRenameValue(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && handleRenameChat(chat.id)}
                       autoFocus
+                      whileFocus={{ scale: 1.02 }}
                     />
-                    <button onClick={() => handleRenameChat(chat.id)}>Save</button>
-                  </div>
+                    <motion.button 
+                      onClick={() => handleRenameChat(chat.id)}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      Save
+                    </motion.button>
+                  </motion.div>
                 ) : (
                   <>
-                    <button
+                    <motion.button
                       className="chat-name"
                       onClick={() => loadChat(chat.id)}
                       title={chat.name}
+                      whileHover={{ x: 5 }}
                     >
                       {chat.name}
-                    </button>
-                    <div className="chat-actions">
-                      <button
+                    </motion.button>
+                    <motion.div 
+                      className="chat-actions"
+                      initial={{ opacity: 0 }}
+                      whileHover={{ opacity: 1 }}
+                    >
+                      <motion.button
                         className="action-btn rename"
                         onClick={() => {
                           setRenamingChatId(chat.id);
                           setRenameValue(chat.name);
                         }}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
                       >
                         Edit
-                      </button>
-                      <button
+                      </motion.button>
+                      <motion.button
                         className="action-btn delete"
                         onClick={() => handleDeleteChat(chat.id)}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
                       >
                         Delete
-                      </button>
-                    </div>
+                      </motion.button>
+                    </motion.div>
                   </>
                 )}
-              </div>
+              </motion.div>
             ))
           )}
-        </div>
+        </motion.div>
 
-        <button className="back-btn sidebar" onClick={onBack}>
+        <motion.button 
+          className="back-btn sidebar" 
+          onClick={onBack}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
           ← Back
-        </button>
-      </aside>
+        </motion.button>
+      </motion.aside>
 
       {/* Main chat area */}
-      <div className="aichat-main">
-        <div className="aichat-header">
+      <motion.div 
+        className="aichat-main"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2 }}
+      >
+        <motion.div 
+          className="aichat-header"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.4 }}
+        >
           <h1>{currentChatName}</h1>
-        </div>
+        </motion.div>
 
-        <div className="chat-messages">
+        <motion.div 
+          className="chat-messages"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ staggerChildren: 0.05 }}
+        >
           {messages.map(msg => (
-            <div key={msg.id} className={`message ${msg.sender}`}>
+            <motion.div 
+              key={msg.id} 
+              className={`message ${msg.sender}`}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
               <div className={`message-content ${msg.sender}`}>
                 {msg.sender === 'ai' ? (
                   <ReactMarkdown
@@ -329,41 +416,72 @@ function AIChat({ user, onBack }) {
                   msg.text
                 )}
               </div>
-            </div>
+            </motion.div>
           ))}
           {loading && (
-            <div className="message ai">
+            <motion.div 
+              className="message ai"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
               <div className="message-content ai">
                 <span className="typing-indicator">
-                  <span></span><span></span><span></span>
+                  <motion.span
+                    animate={{ y: [0, -10, 0] }}
+                    transition={{ duration: 0.6, repeat: Infinity }}
+                  ></motion.span>
+                  <motion.span
+                    animate={{ y: [0, -10, 0] }}
+                    transition={{ duration: 0.6, repeat: Infinity, delay: 0.1 }}
+                  ></motion.span>
+                  <motion.span
+                    animate={{ y: [0, -10, 0] }}
+                    transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
+                  ></motion.span>
                 </span>
               </div>
-            </div>
+            </motion.div>
           )}
           <div ref={messagesEndRef} />
-        </div>
+        </motion.div>
 
-        {error && <div className="error-message">{error}</div>}
+        {error && (
+          <motion.div 
+            className="error-message"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            {error}
+          </motion.div>
+        )}
 
-        <div className="chat-input-section">
-          <textarea
+        <motion.div 
+          className="chat-input-section"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <motion.textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Ask anything... (Shift+Enter for new line)"
             className="chat-input"
             disabled={loading || !currentChatId}
+            whileFocus={{ scale: 1.01 }}
           />
-          <button
+          <motion.button
             onClick={handleSendMessage}
             disabled={loading || !input.trim() || !currentChatId}
             className="send-btn"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
             {loading ? 'Sending...' : 'Send'}
-          </button>
-        </div>
-      </div>
-    </div>
+          </motion.button>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 }
 

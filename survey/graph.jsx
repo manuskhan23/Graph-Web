@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { ref, onValue } from 'firebase/database';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement } from 'chart.js';
 import { Pie, Bar, Line } from 'react-chartjs-2';
@@ -229,17 +230,26 @@ function SurveyGraph({ onBack }) {
 
   if (error) {
     return (
-      <div className="survey-graph-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{
-          background: 'white',
-          padding: '40px',
-          borderRadius: '8px',
-          textAlign: 'center',
-          maxWidth: '500px'
-        }}>
+      <motion.div 
+        className="survey-graph-container" 
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <motion.div 
+          style={{
+            background: 'white',
+            padding: '40px',
+            borderRadius: '8px',
+            textAlign: 'center',
+            maxWidth: '500px'
+          }}
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+        >
           <h2 style={{ color: '#e74c3c', marginBottom: '20px' }}>Error</h2>
           <p style={{ color: '#666', marginBottom: '20px' }}>{error}</p>
-          <button 
+          <motion.button 
             onClick={onBack}
             style={{
               padding: '10px 20px',
@@ -250,19 +260,29 @@ function SurveyGraph({ onBack }) {
               cursor: 'pointer',
               fontWeight: '600'
             }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
             ← Back to Home
-          </button>
-        </div>
-      </div>
-    );
-  }
+          </motion.button>
+          </motion.div>
+          </motion.div>
+          );
+          }
 
-  if (loading) {
-    return (
-      <div className="survey-graph-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
+          if (loading) {
+          return (
+          <motion.div 
+          className="survey-graph-container" 
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          >
+          <div style={{ textAlign: 'center' }}>
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+            style={{
             width: '50px',
             height: '50px',
             border: '4px solid #f3f3f3',
@@ -270,17 +290,34 @@ function SurveyGraph({ onBack }) {
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
             margin: '0 auto 20px'
-          }}></div>
-          <h2 style={{ color: '#333' }}>Loading survey data...</h2>
+          }}></motion.div>
+          <motion.h2 
+            style={{ color: '#333' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            Loading survey data...
+          </motion.h2>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="survey-graph-container">
-      <div className="chart-wrapper">
-        <button 
+    <motion.div 
+      className="survey-graph-container"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+    >
+      <motion.div 
+        className="chart-wrapper"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.1 }}
+      >
+        <motion.button 
           onClick={onBack} 
           style={{
             padding: '10px 20px',
@@ -292,9 +329,11 @@ function SurveyGraph({ onBack }) {
             cursor: 'pointer',
             fontWeight: '600'
           }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
         >
           ← Back
-        </button>
+        </motion.button>
 
         <h1 style={{ color: '#333', marginBottom: '10px' }}>Survey Analytics Dashboard</h1>
         <p style={{ color: '#666', marginBottom: '30px' }}>Total Responses: <strong>{stats.totalResponses}</strong></p>
@@ -441,15 +480,15 @@ function SurveyGraph({ onBack }) {
             </div>
           </>
         )}
-      </div>
 
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
-    </div>
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+      </motion.div>
+    </motion.div>
   );
 }
 

@@ -70,6 +70,7 @@
 
 .admin-loading {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   height: 100vh;
@@ -861,7 +862,9 @@
 .unique-students-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 20px;
+  gap: 20px !important;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .student-card {

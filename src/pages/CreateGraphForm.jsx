@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { saveGraphData, graphNameExists } from '../firebase';
 import Graph from '../components/Graph';
 
@@ -104,75 +105,142 @@ function CreateGraphForm({ user, categoryType, onBack }) {
     }
   };
 
-  return (
-    <div className="create-graph-container">
-      <button className="back-btn" onClick={onBack}>← Back</button>
-      
-      <h1>Create {categoryTitles[categoryType]} Graph</h1>
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.2,
+      },
+    },
+  };
 
-      <div className="form-section">
-        <div className="form-group">
-          <label>Graph Name *</label>
-          <input
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: { duration: 0.5 },
+    },
+  };
+
+  return (
+    <motion.div 
+      className="create-graph-container"
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+    >
+      <motion.button 
+        className="back-btn" 
+        onClick={onBack}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+      >
+        ← Back
+      </motion.button>
+      
+      <motion.h1 variants={itemVariants}>Create {categoryTitles[categoryType]} Graph</motion.h1>
+
+      <motion.div className="form-section" variants={containerVariants}>
+        <motion.div className="form-group" variants={itemVariants}>
+          <motion.label variants={itemVariants}>Graph Name *</motion.label>
+          <motion.input
             type="text"
             value={graphName}
             onChange={(e) => setGraphName(e.target.value)}
             placeholder="e.g., Q1 Sales Report"
+            whileFocus={{ scale: 1.02, boxShadow: '0 0 10px rgba(102, 126, 234, 0.5)' }}
           />
-        </div>
+        </motion.div>
 
-        <div className="form-group">
-          <label>Chart Type *</label>
-          <select value={chartType} onChange={(e) => setChartType(e.target.value)}>
+        <motion.div className="form-group" variants={itemVariants}>
+          <motion.label variants={itemVariants}>Chart Type *</motion.label>
+          <motion.select 
+            value={chartType} 
+            onChange={(e) => setChartType(e.target.value)}
+            whileFocus={{ scale: 1.02 }}
+          >
             <option value="line">Line Chart</option>
             <option value="bar">Bar Chart</option>
             <option value="pie">Pie Chart</option>
-          </select>
-        </div>
+          </motion.select>
+        </motion.div>
 
-        <div className="form-group">
-          <label>Labels (comma-separated) *</label>
-          <input
+        <motion.div className="form-group" variants={itemVariants}>
+          <motion.label variants={itemVariants}>Labels (comma-separated) *</motion.label>
+          <motion.input
             type="text"
             value={labels}
             onChange={(e) => setLabels(e.target.value)}
             placeholder="e.g., Jan, Feb, Mar, Apr, May"
+            whileFocus={{ scale: 1.02, boxShadow: '0 0 10px rgba(102, 126, 234, 0.5)' }}
           />
-        </div>
+        </motion.div>
 
-        <div className="form-group">
-          <label>Data (comma-separated numbers) *</label>
-          <input
+        <motion.div className="form-group" variants={itemVariants}>
+          <motion.label variants={itemVariants}>Data (comma-separated numbers) *</motion.label>
+          <motion.input
             type="text"
             value={data}
             onChange={(e) => setData(e.target.value)}
             placeholder="e.g., 100, 150, 200, 250, 300"
+            whileFocus={{ scale: 1.02, boxShadow: '0 0 10px rgba(102, 126, 234, 0.5)' }}
           />
-        </div>
+        </motion.div>
 
-        {error && <div className="error">{error}</div>}
+        {error && (
+          <motion.div 
+            className="error"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            {error}
+          </motion.div>
+        )}
 
-        <div className="form-buttons">
-          <button className="preview-btn" onClick={handlePreview}>
+        <motion.div className="form-buttons" variants={containerVariants}>
+          <motion.button 
+            className="preview-btn" 
+            onClick={handlePreview}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            variants={itemVariants}
+          >
             Preview
-          </button>
-          <button 
+          </motion.button>
+          <motion.button 
             className="save-btn" 
             onClick={handleSave} 
             disabled={!preview || saving}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            variants={itemVariants}
           >
             {saving ? 'Saving...' :  'Save Graph'}
-          </button>
-        </div>
-      </div>
+          </motion.button>
+        </motion.div>
+      </motion.div>
 
       {preview && (
-        <div className="preview-section-inline">
-          <h2>Graph Preview</h2>
+        <motion.div 
+          className="preview-section-inline"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+        >
+          <motion.h2
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+          >
+            Graph Preview
+          </motion.h2>
           <Graph type={chartType} title={graphName} data={preview} />
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }
 

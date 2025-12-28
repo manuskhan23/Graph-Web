@@ -31,10 +31,16 @@ export async function sendMessage(message) {
   try {
     console.log('[INFO] Sending message to Groq API...');
     
+    const groqApiKey = import.meta.env.VITE_GROQ_API_KEY;
+    if (!groqApiKey) {
+      throw new Error('VITE_GROQ_API_KEY is not set. Please add it to your .env file');
+    }
+    
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${groqApiKey}`
       },
       body: JSON.stringify({
         model: GROQ_MODEL,

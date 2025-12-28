@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import './form.css';
 import { showSuccessAlert, showErrorAlert } from '../src/utils/alerts';
 import { submitSurvey } from './surveyFirebase';
@@ -168,13 +169,60 @@ function SurveyForm({ onComplete }) {
     }
   };
 
-  return (
-    <div className="survey-container">
-      <div className="survey-form-wrapper">
-        <h1 className="survey-title">Student Social Media Survey</h1>
-        <p className="survey-subtitle">Please answer all questions</p>
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1, delayChildren: 0.2 },
+    },
+  };
 
-        <form onSubmit={handleSubmit} className="survey-form">
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: { duration: 0.5 },
+    },
+  };
+
+  return (
+    <motion.div 
+      className="survey-container"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
+      <motion.div 
+        className="survey-form-wrapper"
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        <motion.h1 
+          className="survey-title"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.6 }}
+        >
+          Student Social Media Survey
+        </motion.h1>
+        <motion.p 
+          className="survey-subtitle"
+          initial={{ y: -10, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+        >
+          Please answer all questions
+        </motion.p>
+
+        <motion.form 
+          onSubmit={handleSubmit} 
+          className="survey-form"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
           {/* Question 1: Name */}
           <div className="form-floating mb-3">
             <input
@@ -313,16 +361,21 @@ function SurveyForm({ onComplete }) {
             {errors.timeSpent && touched.timeSpent && <div className="text-danger small mt-2">{errors.timeSpent}</div>}
           </div>
 
-          <button 
+          <motion.button 
             type="submit" 
             className="btn btn-primary btn-lg w-100 submit-btn"
             disabled={!isFormValid()}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
           >
             Submit Survey
-          </button>
-        </form>
-      </div>
-    </div>
+          </motion.button>
+        </motion.form>
+      </motion.div>
+    </motion.div>
   );
 }
 

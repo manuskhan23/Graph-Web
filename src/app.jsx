@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { onAuthStateReady } from './firebase';
 import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
@@ -118,18 +119,40 @@ function App() {
 
   if (loading) {
     return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        color: 'white',
-        fontSize: '18px',
-        fontWeight: '600'
-      }}>
-        Loading your application...
-      </div>
+      <motion.div 
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100vh',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          fontSize: '18px',
+          fontWeight: '600',
+          gap: '20px'
+        }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+          style={{
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            border: '4px solid rgba(255,255,255,0.3)',
+            borderTop: '4px solid white'
+          }}
+        />
+        <motion.p
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        >
+          Loading your application...
+        </motion.p>
+      </motion.div>
     );
   }
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { getCurrentUser } from '../firebase';
 import {
   saveCalculatorHistory,
@@ -311,26 +312,61 @@ function ScientificCalculator({ onBack }) {
   if (loading) {
     return (
       <div className="calculator-container">
-        <div style={{ textAlign: 'center', color: 'white', paddingTop: '50px' }}>
+        <motion.div 
+          style={{ textAlign: 'center', color: 'white', paddingTop: '50px' }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              border: '4px solid rgba(255,255,255,0.3)',
+              borderTop: '4px solid white',
+              margin: '0 auto 20px'
+            }}
+          />
           Loading calculator...
-        </div>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="calculator-container">
-      <button className="back-btn" onClick={onBack}>
+    <motion.div 
+      className="calculator-container"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+    >
+      <motion.button 
+        className="back-btn" 
+        onClick={onBack}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+      >
         ← Back
-      </button>
+      </motion.button>
 
       {syncing && (
-        <div className="sync-indicator">
+        <motion.div 
+          className="sync-indicator"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
           Syncing...
-        </div>
+        </motion.div>
       )}
 
-      <div className="calculator-wrapper">
+      <motion.div 
+        className="calculator-wrapper"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.1 }}
+      >
         {/* Calculator Main */}
         <div className="calculator-main">
           <h2>Scientific Calculator</h2>
@@ -485,8 +521,8 @@ function ScientificCalculator({ onBack }) {
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

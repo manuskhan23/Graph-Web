@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import Swal from 'sweetalert2';
 import { getUserGraphs, saveGraphData, updateGraphData, graphNameExists, database, set, ref } from '../../firebase';
 import { remove } from 'firebase/database';

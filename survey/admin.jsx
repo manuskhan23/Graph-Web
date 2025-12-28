@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { ref, onValue, remove } from "firebase/database";
 import { Bar, Line, Pie } from "react-chartjs-2";
 import {
@@ -230,13 +231,6 @@ function AdminDashboard({ onBack }) {
       survey.section.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const stats = {
-    totalResponses: surveys.length,
-    uniqueStudents: new Set(surveys.map((s) => s.name)).size,
-    platforms: {},
-    timeSpent: {},
-  };
-
   // Platform color mapping
   const platformColors = {
     youtube: "#FF0000",
@@ -255,7 +249,26 @@ function AdminDashboard({ onBack }) {
     "8plus": "#F44336",
   };
 
+  // Get unique students with their latest data
+  const uniqueStudentsMap = new Map();
   surveys.forEach((survey) => {
+    if (!uniqueStudentsMap.has(survey.name)) {
+      uniqueStudentsMap.set(survey.name, survey);
+    }
+  });
+
+  const uniqueStudentsData = Array.from(uniqueStudentsMap.values());
+
+  // Calculate stats based on UNIQUE STUDENTS only
+  const stats = {
+    totalResponses: surveys.length,
+    uniqueStudents: uniqueStudentsData.length,
+    platforms: {},
+    timeSpent: {},
+  };
+
+  // Count platforms and time spent only for UNIQUE students (using latest data)
+  uniqueStudentsData.forEach((survey) => {
     // Handle multiple platforms (array)
     if (Array.isArray(survey.platforms)) {
       survey.platforms.forEach((platform) => {
@@ -271,22 +284,58 @@ function AdminDashboard({ onBack }) {
 
   if (loading) {
     return (
-      <div className="admin-loading">
+      <motion.div 
+        className="admin-loading"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+          style={{
+            width: '50px',
+            height: '50px',
+            borderRadius: '50%',
+            border: '4px solid #f0f0f0',
+            borderTop: '4px solid #667eea',
+            margin: '0 auto 20px'
+          }}
+        />
         <h2>Loading admin dashboard...</h2>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="admin-container">
-      <div className="admin-header">
+    <motion.div 
+      className="admin-container"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+    >
+      <motion.div 
+        className="admin-header"
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      >
         <h1>📊 Admin Dashboard</h1>
-        <button className="btn-back" onClick={onBack}>
+        <motion.button 
+          className="btn-back" 
+          onClick={onBack}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
           ← Back
-        </button>
-      </div>
+        </motion.button>
+      </motion.div>
 
-      <div className="admin-nav">
+      <motion.div 
+        className="admin-nav"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ staggerChildren: 0.1, delayChildren: 0.2 }}
+      >
         <button
           className={`admin-nav-btn ${view === "dashboard" ? "active" : ""}`}
           onClick={() => setView("dashboard")}
@@ -315,11 +364,16 @@ function AdminDashboard({ onBack }) {
             Manage Admins
           </button>
         )}
-      </div>
+      </motion.div>
 
       {/* Dashboard View */}
       {view === "dashboard" && (
-        <div className="admin-dashboard">
+        <motion.div 
+          className="admin-dashboard"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+        >
           {/* Widget Customization Controls */}
           <div className="widget-customization">
             <h3>📊 Customize Dashboard</h3>
@@ -384,15 +438,27 @@ function AdminDashboard({ onBack }) {
               </div>
             </div>
 
-            <div className="stat-card">
+            <motion.div 
+              className="stat-card"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              whileHover={{ scale: 1.05 }}
+            >
               <div className="stat-icon">👥</div>
               <div className="stat-content">
                 <div className="stat-label">Unique Students</div>
                 <div className="stat-value">{stats.uniqueStudents}</div>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="stat-card">
+            <motion.div 
+              className="stat-card"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              whileHover={{ scale: 1.05 }}
+            >
               <div className="stat-icon">📱</div>
               <div className="stat-content">
                 <div className="stat-label">Most Used Platform</div>
@@ -404,9 +470,15 @@ function AdminDashboard({ onBack }) {
                     : "N/A"}
                 </div>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="stat-card">
+            <motion.div 
+              className="stat-card"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              whileHover={{ scale: 1.05 }}
+            >
               <div className="stat-icon">⏱️</div>
               <div className="stat-content">
                 <div className="stat-label">Avg Time Spent</div>
@@ -418,10 +490,15 @@ function AdminDashboard({ onBack }) {
                     : "N/A"}
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
 
-          <div className="admin-breakdown">
+          <motion.div 
+            className="admin-breakdown"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
             {/* Platform Usage Charts */}
             <div className="charts-container">
               {visibleWidgets.platformBar && (
@@ -654,13 +731,18 @@ function AdminDashboard({ onBack }) {
                   </div>
                   )}
                   </div>
-                  </div>
-                  </div>
-                  )}
+                  </motion.div>
+        </motion.div>
+        )}
 
       {/* Unique Students View */}
       {view === "unique-students" && (
-        <div className="admin-unique-students">
+        <motion.div 
+          className="admin-unique-students"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+        >
           <div className="unique-students-header">
             <h2>Unique Students List</h2>
             <p>Total: {stats.uniqueStudents} unique students</p>
@@ -809,13 +891,18 @@ function AdminDashboard({ onBack }) {
                   ))}
               </div>
             </>
-          )}
-        </div>
-      )}
+            )}
+            </motion.div>
+            )}
 
-      {/* Responses View */}
+            {/* Responses View */}
       {view === "responses" && (
-        <div className="admin-responses">
+        <motion.div 
+          className="admin-responses"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+        >
           <div className="responses-header">
             <input
               type="text"
@@ -937,14 +1024,14 @@ function AdminDashboard({ onBack }) {
               </div>
             </>
           )}
-        </div>
+        </motion.div>
       )}
 
       {/* Manage Admins View */}
       {view === "manage-admins" && (
         <AdminManager onBack={() => setView("dashboard")} />
       )}
-    </div>
+    </motion.div>
   );
 }
 

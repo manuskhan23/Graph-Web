@@ -78,6 +78,10 @@ Graph Website is a modern, full-stack web application that empowers users to cre
 | 🚫 **Duplicate Detection** | Smart name validation prevents duplicates |
 | 📱 **Responsive Design** | Works beautifully on desktop, tablet & mobile |
 | ⚡ **Lightning Fast** | Built with Vite for instant HMR |
+| 🤖 **AI Assistant** | Chat with AI powered by Groq API for instant help |
+| 📋 **Survey System** | Create and manage surveys with admin dashboard |
+| 📊 **Analytics Dashboard** | View insights based on unique students |
+| 🧮 **Scientific Calculator** | Built-in advanced calculator |
 
 ---
 
@@ -85,11 +89,11 @@ Graph Website is a modern, full-stack web application that empowers users to cre
 
 <div align="center">
 
-| Frontend | Backend | Tools |
+| Frontend | Backend | Tools & APIs |
 |----------|---------|-------|
 | ![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react) | ![Firebase](https://img.shields.io/badge/Firebase-Realtime-FFCA28?logo=firebase) | ![Vite](https://img.shields.io/badge/Vite-7.2-646CFF?logo=vite) |
-| ![Chart.js](https://img.shields.io/badge/Chart.js-4.5-FF6384) | ![Firestore](https://img.shields.io/badge/Firestore-Database-FFCA28?logo=firebase) | ![ESLint](https://img.shields.io/badge/ESLint-9.39-4B32C3?logo=eslint) |
-| ![React Router](https://img.shields.io/badge/React_Router-7.11-CA4245?logo=react-router) | ![Cloud Storage](https://img.shields.io/badge/Cloud_Storage-Upload-FFCA28?logo=firebase) | ![Node.js](https://img.shields.io/badge/Node.js-16+-339933?logo=node.js) |
+| ![Chart.js](https://img.shields.io/badge/Chart.js-4.5-FF6384) | ![Firestore](https://img.shields.io/badge/Firestore-Database-FFCA28?logo=firebase) | ![Groq API](https://img.shields.io/badge/Groq%20API-AI-4B32C3) |
+| ![Framer Motion](https://img.shields.io/badge/Framer%20Motion-Animations-0055FF) | ![Realtime DB](https://img.shields.io/badge/Realtime_DB-Sync-FFCA28?logo=firebase) | ![Node.js](https://img.shields.io/badge/Node.js-16+-339933?logo=node.js) |
 
 </div>
 
@@ -115,7 +119,14 @@ npm install
 # 3️⃣ Configure Firebase
 # Update src/firebase.js with your credentials from Firebase Console
 
-# 4️⃣ Start the dev server
+# 4️⃣ Setup environment variables
+# Create .env file in root directory:
+VITE_GROQ_API_KEY=your_groq_api_key_here
+VITE_API_URL=http://localhost:5000/api
+
+# Get Groq API key from https://console.groq.com
+
+# 5️⃣ Start the dev server
 npm run dev
 ```
 
@@ -136,8 +147,29 @@ npm run dev
    ✓ Select metric type
    ✓ Choose chart type (Line/Bar/Pie)
    ✓ Enter your data points
-5. Preview your graph
+5. Preview your graph in real-time
 6. Click Save
+```
+
+### 🤖 Using AI Assistant
+
+```
+1. Click "AI Assistant" button
+2. Select or create a chat
+3. Type your question or request
+4. Get instant responses powered by Groq API
+5. Chat history is automatically saved
+```
+
+### 📋 Creating Surveys
+
+```
+1. Navigate to Survey section
+2. Click "Create New Survey"
+3. Add survey questions
+4. Share link with students
+5. View responses in Admin Dashboard
+6. Analyze insights by unique students
 ```
 
 ### 💡 Example: Business Revenue Report
@@ -343,6 +375,10 @@ docker run -p 3000:3000 graph-website
 ✅ Duplicate name detection
 ✅ Real-time preview
 ✅ User authentication
+✅ AI Assistant Chat (Groq API)
+✅ Survey System with Admin Dashboard
+✅ Real-time Analytics
+✅ Scientific Calculator
 
 🔄 Coming Soon:
 ⬜ CSV/PDF export
@@ -351,8 +387,9 @@ docker run -p 3000:3000 graph-website
 ⬜ Custom themes
 ⬜ Dark mode
 ⬜ Mobile app
-⬜ Real-time sync
-⬜ API integrations
+⬜ Collaborative editing
+⬜ Email notifications
+⬜ Advanced data filtering
 ```
 
 ---
@@ -373,6 +410,14 @@ docker run -p 3000:3000 graph-website
 # ✓ Check browser console (F12)
 # ✓ Verify user is authenticated
 # ✓ Clear cache: Ctrl+Shift+Delete
+```
+
+### AI Chat: Invalid API Key Error
+
+```bash
+# ✓ Ensure VITE_GROQ_API_KEY is set in .env file
+# ✓ Get key from https://console.groq.com
+# ✓ Restart dev server after setting .env
 ```
 
 ### Build Issues

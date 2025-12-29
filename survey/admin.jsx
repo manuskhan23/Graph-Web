@@ -250,10 +250,12 @@ function AdminDashboard({ onBack }) {
   };
 
   // Get unique students with their latest data
+  // Create composite key: name + fatherName + section + class
   const uniqueStudentsMap = new Map();
   surveys.forEach((survey) => {
-    if (!uniqueStudentsMap.has(survey.name)) {
-      uniqueStudentsMap.set(survey.name, survey);
+    const studentKey = `${survey.name}|${survey.fatherName}|${survey.section}|${survey.class}`;
+    if (!uniqueStudentsMap.has(studentKey)) {
+      uniqueStudentsMap.set(studentKey, survey);
     }
   });
 
@@ -781,13 +783,18 @@ function AdminDashboard({ onBack }) {
 
               {/* Students List */}
               <div className="unique-students-list">
-                {Array.from(new Set(surveys.map((s) => s.name)))
-                  .map((studentName) => {
-                    const studentSurveys = surveys.filter((s) => s.name === studentName);
+                {Array.from(uniqueStudentsMap.entries())
+                  .map(([studentKey, firstSurvey]) => {
+                    const studentSurveys = surveys.filter(
+                      (s) => `${s.name}|${s.fatherName}|${s.section}|${s.class}` === studentKey
+                    );
                     const submissionCount = studentSurveys.length;
                     const latestSubmission = studentSurveys[0];
                     return {
-                      name: studentName,
+                      key: studentKey,
+                      name: firstSurvey.name,
+                      fatherName: firstSurvey.fatherName,
+                      section: firstSurvey.section,
                       surveys: studentSurveys,
                       count: submissionCount,
                       latest: latestSubmission,
@@ -799,8 +806,9 @@ function AdminDashboard({ onBack }) {
                     const search = studentSearchTerm.toLowerCase();
                     return (
                       student.name.toLowerCase().includes(search) ||
+                      student.fatherName.toLowerCase().includes(search) ||
                       student.class.toLowerCase().includes(search) ||
-                      student.latest.section.toLowerCase().includes(search)
+                      student.section.toLowerCase().includes(search)
                     );
                   })
                   // Sort students
@@ -814,8 +822,8 @@ function AdminDashboard({ onBack }) {
                     }
                     return 0;
                   })
-                  .map((student, index) => (
-                    <div key={index} className="student-card">
+                  .map((student) => (
+                    <div key={student.key} className="student-card">
                       <div
                         className="student-card-header"
                         onClick={() =>

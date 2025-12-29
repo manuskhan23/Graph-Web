@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { logout, getCurrentUser } from '../firebase';
+import logo from '../logo.png';
 
 function Navbar({ onLogout, onPageChange, currentPage }) {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -90,12 +91,17 @@ function Navbar({ onLogout, onPageChange, currentPage }) {
     >
       <div className="container-fluid">
         <motion.a 
-          className="navbar-brand fw-bold fs-5" 
+          className="navbar-brand d-flex align-items-center gap-2" 
           href="#"
-          whileHover={{ scale: 1.1 }}
+          whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
-          MyGraph
+          <img 
+            src={logo} 
+            alt="MyGraph Logo" 
+            style={{ height: '40px', width: '40px', objectFit: 'contain' }}
+          />
+          <span className="fw-bold fs-5">MyGraph</span>
         </motion.a>
         <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
           <span className="navbar-toggler-icon"></span>

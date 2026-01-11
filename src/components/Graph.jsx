@@ -52,15 +52,41 @@ function Graph({ type, title, data }) {
     ...data,
     datasets: data.datasets.map((dataset, index) => {
       if (type === 'pie') {
-        // For pie charts, use array of colors
+        // For pie charts, use array of colors for each data point
+        const dataLength = dataset.data ? dataset.data.length : 0;
+        const colors = pieColors.slice(0, dataLength).concat(
+          pieColors.length < dataLength 
+            ? Array(dataLength - pieColors.length).fill(pieColors[0])
+            : []
+        );
         return {
           ...dataset,
-          backgroundColor: pieColors,
+          backgroundColor: colors,
           borderColor: '#fff',
-          borderWidth: 2
+          borderWidth: 2,
+          fill: false
+        };
+      } else if (type === 'line') {
+        // For line charts
+        const color = colorPalette[index % colorPalette.length];
+        const dataLength = dataset.data ? dataset.data.length : 0;
+        
+        return {
+          ...dataset,
+          borderColor: color.border,
+          backgroundColor: color.bg,
+          fill: false,
+          tension: dataLength > 1 ? 0.4 : 0,  // No tension for single point
+          borderWidth: dataLength > 1 ? (dataset.borderWidth || 3) : 0,  // No border for single point
+          pointBackgroundColor: color.border,
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: dataset.pointRadius || 5,
+          pointHoverRadius: dataset.pointHoverRadius || 7,
+          showLine: dataLength > 1  // Only show line if more than 1 point
         };
       } else {
-        // For line and bar charts, assign different colors to each dataset
+        // For bar charts
         const color = colorPalette[index % colorPalette.length];
         return {
           ...dataset,
@@ -68,9 +94,12 @@ function Graph({ type, title, data }) {
           backgroundColor: color.bg,
           fill: true,
           tension: 0.3,
+          borderWidth: dataset.borderWidth || 2,
           pointBackgroundColor: color.border,
           pointBorderColor: '#fff',
-          pointBorderWidth: 2
+          pointBorderWidth: 2,
+          pointRadius: dataset.pointRadius || 4,
+          pointHoverRadius: dataset.pointHoverRadius || 6
         };
       }
     })
@@ -89,7 +118,16 @@ function Graph({ type, title, data }) {
     },
     scales: type === 'pie' ? {} : {
       y: {
-        beginAtZero: true
+        beginAtZero: true,
+        ticks: {
+          beginAtZero: true
+        }
+      },
+      x: {
+        ticks: {
+          maxRotation: 45,
+          minRotation: 0
+        }
       }
     }
   };

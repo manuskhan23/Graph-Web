@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Swal from 'sweetalert2';
-import { getUserGraphs, saveGraphData, graphNameExists, database } from '../../firebase';
+import { getUserGraphs, saveGraphData, updateGraphData, graphNameExists, database, shareGraph, getGraphShareCodes, revokeShareCode } from '../../firebase';
 import { ref, remove } from 'firebase/database';
 import Graph from '../../components/Graph';
 
@@ -17,10 +17,17 @@ function EducationGraph({ user, onBack }) {
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [viewingGraphId, setViewingGraphId] = useState(null);
+  const [viewGraphId, setViewGraphId] = useState(null);
+  const [editGraphId, setEditGraphId] = useState(null);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [currentShareGraphId, setCurrentShareGraphId] = useState(null);
+  const [shareCodes, setShareCodes] = useState([]);
+  const [loadingShares, setLoadingShares] = useState(false);
 
   useEffect(() => {
     fetchGraphs();
+    setViewGraphId(null);
+    setShowForm(false);
   }, [user]);
 
   const fetchGraphs = async () => {
@@ -32,6 +39,10 @@ function EducationGraph({ user, onBack }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleViewGraph = (graphId) => {
+    setViewGraphId(graphId);
   };
 
   const handleInputChange = (index, field, value) => {
@@ -62,35 +73,42 @@ function EducationGraph({ user, onBack }) {
     }
 
     try {
-      const names = formData.map(d => d.name);
-      const firstResults = formData.map(d => parseFloat(d.firstResult));
-      const secondResults = formData.map(d => parseFloat(d.secondResult));
+       const names = formData.map(d => d.name.trim());
+       const firstResults = formData.map(d => parseFloat(d.firstResult));
+       const secondResults = formData.map(d => parseFloat(d.secondResult));
 
-      const previewData = {
-        labels: names,
-        datasets: [
-          {
-            label: 'First Result',
-            data:  firstResults,
-            borderColor: '#4ECDC4',
-            backgroundColor:  'rgba(78, 205, 196, 0.6)',
-            tension: 0.3
-          },
-          {
-            label: 'Second Result',
-            data: secondResults,
-            borderColor: '#FF9800',
-            backgroundColor: 'rgba(255, 152, 0, 0.6)',
-            tension: 0.3
-          }
-        ]
-      };
+       // Validate numbers
+       if (firstResults.some(v => isNaN(v)) || secondResults.some(v => isNaN(v))) {
+         setError('[!] Please enter valid numbers');
+         return;
+       }
 
-      setPreview(previewData);
-      setError('');
-    } catch (err) {
-      setError(`[✗] ${err.message}`);
-    }
+       if (names.length === 0 || firstResults.length === 0 || secondResults.length === 0) {
+         setError('[!] No data to preview');
+         return;
+       }
+
+       const previewData = {
+         labels: names,
+         datasets: [
+           {
+             label: 'First Result',
+             data:  firstResults
+           },
+           {
+             label: 'Second Result',
+             data: secondResults
+           }
+         ]
+       };
+
+       console.log('Preview Data:', { chartType, previewData });
+       setPreview(previewData);
+       setError('');
+     } catch (err) {
+       console.error('Preview Error:', err);
+       setError(`[✗] ${err.message}`);
+     }
   };
 
   const handleSave = async () => {
@@ -103,42 +121,70 @@ function EducationGraph({ user, onBack }) {
     setError('');
 
     try {
-      // Check if graph name already exists
-      const nameExists = await graphNameExists(user.uid, 'education', reportName);
-      if (nameExists) {
-        setError(`[!] A graph with the name "${reportName}" already exists. Please choose a different name.`);
-        setSaving(false);
-        return;
-      }
-
       const graphData = {
         labels: preview.labels,
         data: preview.datasets,
         type: chartType
       };
 
-      await saveGraphData(user.uid, 'education', reportName, graphData);
-       Swal.fire({
-         icon: 'success',
-         title: 'Saved!',
-         text: 'Education report saved successfully',
-         timer: 1500,
-         showConfirmButton: false
-       });
-       
-       // Reset form
-       setFormData([{ name: '', firstResult: '', secondResult: '' }]);
-       setReportName('');
-       setPreview(null);
-       setShowForm(false);
-       
-       // Refresh graphs
-       fetchGraphs();
+      if (editGraphId) {
+        // Update existing graph
+        await updateGraphData(user.uid, 'education', editGraphId, reportName, graphData);
+        Swal.fire({
+          icon: 'success',
+          title: 'Updated!',
+          text: 'Education report updated successfully',
+          timer: 1500,
+          showConfirmButton: false
+        });
+        setEditGraphId(null);
+      } else {
+        // Check if graph name already exists (only for new graphs)
+        const nameExists = await graphNameExists(user.uid, 'education', reportName);
+        if (nameExists) {
+          setError(`[!] A graph with the name "${reportName}" already exists. Please choose a different name.`);
+          setSaving(false);
+          return;
+        }
+
+        // Save new graph
+        await saveGraphData(user.uid, 'education', reportName, graphData);
+        Swal.fire({
+          icon: 'success',
+          title: 'Saved!',
+          text: 'Education report saved successfully',
+          timer: 1500,
+          showConfirmButton: false
+        });
+      }
+
+      // Reset form
+      setFormData([{ name: '', firstResult: '', secondResult: '' }]);
+      setReportName('');
+      setPreview(null);
+      setShowForm(false);
+      
+      // Refresh graphs
+      fetchGraphs();
     } catch (err) {
       setError(`[✗] Error: ${err.message}`);
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleEdit = async (graphId, graphData) => {
+    setEditGraphId(graphId);
+    setReportName(graphData.name);
+    setChartType(graphData.type);
+    setFormData(graphData.labels.map((label, idx) => ({
+      name: label,
+      firstResult: graphData.data[0].data[idx],
+      secondResult: graphData.data[1].data[idx]
+    })));
+    setPreview(null);  // Clear preview when starting edit
+    setError('');  // Clear any errors
+    setShowForm(true);
   };
 
   const handleDelete = async (graphId) => {
@@ -180,6 +226,93 @@ function EducationGraph({ user, onBack }) {
 
   const graphCount = Object.keys(graphs).length;
 
+  const handleOpenShareModal = async (graphId) => {
+    setCurrentShareGraphId(graphId);
+    setShareModalOpen(true);
+    setLoadingShares(true);
+    
+    try {
+      const codes = await getGraphShareCodes(user.uid, 'education', graphId);
+      setShareCodes(codes);
+    } catch (err) {
+      console.error('Error fetching share codes:', err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to load share codes'
+      });
+    } finally {
+      setLoadingShares(false);
+    }
+  };
+
+  const handleCreateShare = async (isPublic) => {
+    if (!currentShareGraphId) return;
+
+    try {
+      const code = await shareGraph(user.uid, 'education', currentShareGraphId, isPublic);
+      setShareCodes([...shareCodes, {
+        shareCode: code,
+        isPublic: isPublic,
+        createdAt: new Date().toISOString()
+      }]);
+      
+      Swal.fire({
+        icon: 'success',
+        title: 'Share Link Created!',
+        html: `
+          <div style="text-align: left; margin: 15px 0;">
+            <p><strong>Share Code:</strong></p>
+            <code style="background: #f0f0f0; padding: 8px; border-radius: 4px; display: block; word-break: break-all;">${code}</code>
+            <p style="margin-top: 10px;"><strong>Full Link:</strong></p>
+            <code style="background: #f0f0f0; padding: 8px; border-radius: 4px; display: block; word-break: break-all;">${window.location.origin}/?share=${code}</code>
+            <p style="margin-top: 10px; font-size: 12px;">
+              ${isPublic ? '🌐 This graph is PUBLIC - anyone with the link can view it' : '🔒 This graph is PRIVATE - only shared links work'}
+            </p>
+          </div>
+        `,
+        confirmButtonText: 'Copy & Close'
+      }).then(() => {
+        navigator.clipboard.writeText(`${window.location.origin}/?share=${code}`);
+      });
+    } catch (err) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to create share link: ' + err.message
+      });
+    }
+  };
+
+  const handleRevokeShare = async (shareCode) => {
+    const result = await Swal.fire({
+      title: 'Revoke Share Link?',
+      text: 'This share link will no longer work',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      confirmButtonText: 'Yes, revoke it!'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await revokeShareCode(shareCode);
+        setShareCodes(shareCodes.filter(s => s.shareCode !== shareCode));
+        Swal.fire({
+          icon: 'success',
+          title: 'Revoked!',
+          text: 'Share link has been revoked'
+        });
+      } catch (err) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'Failed to revoke share link'
+        });
+      }
+    }
+  };
+
   // Scroll to preview when it appears
   useEffect(() => {
     if (preview) {
@@ -191,6 +324,47 @@ function EducationGraph({ user, onBack }) {
       }, 100);
     }
   }, [preview]);
+
+  // If viewing a graph, show detail view
+  if (viewGraphId && graphs[viewGraphId]) {
+    const graph = graphs[viewGraphId];
+    const chartData = {
+      labels: graph.labels,
+      datasets: graph.data
+    };
+
+    return (
+      <div className="category-page-container">
+        <button className="back-btn" onClick={() => setViewGraphId(null)}>← Back</button>
+        
+        <h1>{graph.name}</h1>
+        <p>Created: {new Date(graph.createdAt).toLocaleDateString()}</p>
+        <p>Type: {graph.type.toUpperCase()}</p>
+
+        <div className="graph-actions">
+          <button className="share-btn" onClick={() => handleOpenShareModal(viewGraphId)}>
+            Share
+          </button>
+          <button className="edit-btn" onClick={() => {
+            handleEdit(viewGraphId, graph);
+            setViewGraphId(null);
+          }}>
+            Edit
+          </button>
+          <button className="delete-btn" onClick={() => {
+            handleDelete(viewGraphId);
+            setViewGraphId(null);
+          }}>
+            Delete
+          </button>
+        </div>
+
+        <div className="graph-display">
+          <Graph type={graph.type} title={graph.name} data={chartData} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="category-page-container">
@@ -223,6 +397,7 @@ function EducationGraph({ user, onBack }) {
             <select value={chartType} onChange={(e) => setChartType(e.target.value)}>
               <option value="bar">Bar Chart</option>
               <option value="line">Line Chart</option>
+              <option value="pie">Pie Chart</option>
             </select>
           </div>
 
@@ -304,38 +479,91 @@ function EducationGraph({ user, onBack }) {
                   <p>Created: {new Date(graph.createdAt).toLocaleDateString()}</p>
                 </div>
                 <div className="graph-item-actions">
-                  <button className="preview-btn" onClick={() => setViewingGraphId(id)}>
-                    Preview
-                  </button>
-                  <button className="delete-btn" onClick={() => handleDelete(id)}>
-                    Delete
-                  </button>
-                </div>
+                   <button className="preview-btn" onClick={() => handleViewGraph(id)}>
+                     Preview
+                   </button>
+                   <button className="share-btn" onClick={() => handleOpenShareModal(id)}>
+                     Share
+                   </button>
+                   <button className="edit-btn" onClick={() => handleEdit(id, graph)}>
+                     Edit
+                   </button>
+                   <button className="delete-btn" onClick={() => handleDelete(id)}>
+                     Delete
+                   </button>
+                 </div>
               </div>
             ))
           )}
         </div>
       )}
 
-      {/* Graph Preview Modal */}
-      {viewingGraphId && graphs[viewingGraphId] && (
-        <div className="preview-section">
-          <div className="preview-header">
-            <h2>{graphs[viewingGraphId].name}</h2>
-            <button className="close-btn" onClick={() => setViewingGraphId(null)}>Close</button>
+      {/* Share Modal */}
+      {shareModalOpen && (
+        <div className="modal-overlay" onClick={() => setShareModalOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setShareModalOpen(false)}>×</button>
+            <h2>Share Graph</h2>
+            
+            <div className="share-buttons">
+              <button 
+                className="public-share-btn"
+                onClick={() => handleCreateShare(true)}
+              >
+                🌐 Create Public Link
+              </button>
+              <p className="share-desc">Anyone with the link can view (read-only)</p>
+            </div>
+
+            <h3>Existing Share Links</h3>
+            {loadingShares ? (
+              <p>Loading share codes...</p>
+            ) : shareCodes.length === 0 ? (
+              <p className="no-shares">No share links created yet</p>
+            ) : (
+              <div className="share-codes-list">
+                {shareCodes.map((share) => (
+                  <div key={share.shareCode} className="share-code-item">
+                    <div className="share-code-info">
+                      <span className={`visibility-badge ${share.isPublic ? 'public' : 'private'}`}>
+                        {share.isPublic ? '🌐 PUBLIC' : '🔒 PRIVATE'}
+                      </span>
+                      <code>{share.shareCode.substring(0, 12)}...</code>
+                      <small>{new Date(share.createdAt).toLocaleDateString()}</small>
+                    </div>
+                    <div className="share-code-actions">
+                      <button 
+                        className="copy-btn"
+                        onClick={() => {
+                          const url = `${window.location.origin}/?share=${share.shareCode}`;
+                          navigator.clipboard.writeText(url);
+                          Swal.fire({
+                            icon: 'success',
+                            title: 'Copied!',
+                            text: 'Share link copied to clipboard',
+                            timer: 1500,
+                            showConfirmButton: false
+                          });
+                        }}
+                      >
+                        Copy Link
+                      </button>
+                      <button 
+                        className="revoke-btn"
+                        onClick={() => handleRevokeShare(share.shareCode)}
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <Graph 
-            type={graphs[viewingGraphId].type} 
-            title={graphs[viewingGraphId].name} 
-            data={{
-              labels: graphs[viewingGraphId].labels,
-              datasets: graphs[viewingGraphId].data
-            }} 
-          />
         </div>
       )}
-      </div>
-      );
-      }
+    </div>
+  );
+}
 
-      export default EducationGraph;
+export default EducationGraph;

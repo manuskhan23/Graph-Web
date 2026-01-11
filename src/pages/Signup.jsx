@@ -15,9 +15,12 @@ function Signup({ onLoginClick, onSignupSuccess }) {
     setLoading(true);
 
     try {
+      console.log('Attempting signup with:', { email, name });
       await signup(email, password, name);
+      console.log('Signup successful');
       onSignupSuccess();
     } catch (err) {
+      console.error('Signup error:', err);
       setError(err.message || 'Signup failed');
     } finally {
       setLoading(false);

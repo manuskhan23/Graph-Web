@@ -461,24 +461,46 @@ html[data-dark-mode="true"] .graph-item-content p {
 }
 
 .graph-item-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
+   display: flex;
+   gap: 8px;
+   flex-wrap: wrap;
+   align-items: center;
+ }
 
-.view-btn,
-.edit-btn,
-.delete-btn {
-  padding: 8px 12px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  transition: all 0.3s;
-  white-space: nowrap;
-}
+ .graph-item-actions .preview-btn,
+ .graph-item-actions .edit-btn,
+ .graph-item-actions .delete-btn {
+   padding: 8px 12px;
+   font-size: 13px;
+ }
+
+ .graph-item-actions .preview-btn {
+   background-color: #667eea;
+ }
+
+ .graph-item-actions .preview-btn:hover {
+   background-color: #5568d3;
+ }
+
+ .graph-actions {
+   display: flex;
+   gap: 10px;
+   margin: 20px 0;
+   flex-wrap: wrap;
+ }
+
+ .view-btn,
+ .edit-btn,
+ .delete-btn {
+   padding: 8px 12px;
+   border: none;
+   border-radius: 5px;
+   cursor: pointer;
+   font-size: 13px;
+   font-weight: 600;
+   transition: all 0.3s;
+   white-space: nowrap;
+ }
 
 .view-btn {
   background-color: #667eea;
@@ -564,7 +586,6 @@ html[data-dark-mode="true"] .form-section {
 
 .preview-btn,
 .save-btn {
-  flex: 1;
   padding: 12px;
   border: none;
   border-radius: 5px;
@@ -574,6 +595,11 @@ html[data-dark-mode="true"] .form-section {
   font-size: 14px;
 }
 
+.form-buttons .preview-btn,
+.form-buttons .save-btn {
+  flex: 1;
+}
+
 .preview-btn {
   background-color: #FF9800;
   color: white;
@@ -581,6 +607,7 @@ html[data-dark-mode="true"] .form-section {
 
 .preview-btn:hover {
   background-color: #F57C00;
+  transform: scale(1.05);
 }
 
 .save-btn {

@@ -1,15 +1,11 @@
 import React from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 
 function Footer() {
   const currentYear = new Date().getFullYear();
-
-  const handleCategoryClick = (category) => {
-    window.dispatchEvent(new CustomEvent('navigateToCategory', { detail: category }));
-  };
-
-  const handleAIClick = () => {
-    window.dispatchEvent(new CustomEvent('navigateToAI'));
-  };
+  const navigate = useNavigate();
+  const { username, adminname } = useParams();
+  const baseUrl = username ? `/user/${username}` : adminname ? `/admin/${adminname}` : '/';
 
   return (
     <footer className="footer">
@@ -25,7 +21,7 @@ function Footer() {
             <li>
               <button 
                 className="footer-link" 
-                onClick={() => handleCategoryClick('business')}
+                onClick={() => navigate(`${baseUrl}/business/new-graph`)}
               >
                 Business Graphs
               </button>
@@ -33,7 +29,7 @@ function Footer() {
             <li>
               <button 
                 className="footer-link" 
-                onClick={() => handleCategoryClick('education')}
+                onClick={() => navigate(`${baseUrl}/education/new-graph`)}
               >
                 Education Graphs
               </button>
@@ -41,7 +37,7 @@ function Footer() {
             <li>
               <button 
                 className="footer-link" 
-                onClick={() => handleCategoryClick('sports')}
+                onClick={() => navigate(`${baseUrl}/sports/new-graph`)}
               >
                 Sports Graphs
               </button>
@@ -49,7 +45,7 @@ function Footer() {
             <li>
               <button 
                 className="footer-link" 
-                onClick={() => handleCategoryClick('health')}
+                onClick={() => navigate(`${baseUrl}/health/new-graph`)}
               >
                 Health Graphs
               </button>
@@ -57,7 +53,7 @@ function Footer() {
             <li>
               <button 
                 className="footer-link" 
-                onClick={() => handleCategoryClick('weather')}
+                onClick={() => navigate(`${baseUrl}/weather/new-graph`)}
               >
                 Weather Graphs
               </button>
@@ -65,7 +61,7 @@ function Footer() {
             <li>
               <button 
                 className="footer-link" 
-                onClick={() => handleCategoryClick('analytics')}
+                onClick={() => navigate(`${baseUrl}/analytics/new-graph`)}
               >
                 Analytics Graphs
               </button>
@@ -79,32 +75,72 @@ function Footer() {
             <li>
               <button 
                 className="footer-link" 
-                onClick={handleAIClick}
+                onClick={() => navigate(`${baseUrl}/ai-assistant/default`)}
               >
                 AI Assistant
               </button>
             </li>
-            <li><a href="#about">About Us</a></li>
-            <li><a href="#privacy">Privacy Policy</a></li>
-            <li><a href="#terms">Terms & Conditions</a></li>
-            <li><a href="#contact">Contact</a></li>
+            <li>
+              <button 
+                className="footer-link" 
+                onClick={() => navigate(`${baseUrl}/calculator`)}
+              >
+                Scientific Calculator
+              </button>
+            </li>
+            <li>
+              <button 
+                className="footer-link" 
+                onClick={() => navigate(`${baseUrl}/survey-form`)}
+              >
+                Survey Form
+              </button>
+            </li>
           </ul>
         </div>
 
         <div className="footer-section">
-          <h4>Connect</h4>
-          <div className="social-links">
-            <a href="#facebook" className="social-btn" title="Facebook">f</a>
-            <a href="#twitter" className="social-btn" title="Twitter">𝕏</a>
-            <a href="#linkedin" className="social-btn" title="LinkedIn">in</a>
-            <a href="#instagram" className="social-btn" title="Instagram">ig</a>
-          </div>
+          <h4>Legal</h4>
+          <ul>
+            <li>
+              <button 
+                className="footer-link" 
+                onClick={() => navigate(`${baseUrl}/news/privacy-policy`)}
+              >
+                Privacy Policy
+              </button>
+            </li>
+            <li>
+              <button 
+                className="footer-link" 
+                onClick={() => navigate(`${baseUrl}/news/terms-conditions`)}
+              >
+                Terms & Conditions
+              </button>
+            </li>
+            <li>
+              <button 
+                className="footer-link" 
+                onClick={() => navigate(`${baseUrl}/news/about-us`)}
+              >
+                About Us
+              </button>
+            </li>
+            <li>
+              <button 
+                className="footer-link" 
+                onClick={() => navigate(`${baseUrl}/contact`)}
+              >
+                Contact Us
+              </button>
+            </li>
+          </ul>
         </div>
       </div>
 
       <div className="footer-bottom">
         <p>&copy; {currentYear} MyGraph. All rights reserved.</p>
-        <p>Made with care by Your Team</p>
+        <p>Made with ❤️ for data enthusiasts</p>
       </div>
     </footer>
   );

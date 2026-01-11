@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { sendMessage } from '../services/aiService';
@@ -6,6 +7,9 @@ import { createChat, getUserChats, getChat, saveMessageToChat, deleteChat, updat
 import '../styles/aichat.css';
 
 function AIChat({ user, onBack }) {
+  const navigate = useNavigate();
+  const { username, adminname, chatName } = useParams();
+  const baseUrl = username ? `/user/${username}` : `/admin/${adminname}`;
   // Chat list and management
   const [chats, setChats] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
@@ -48,7 +52,7 @@ function AIChat({ user, onBack }) {
       // Set first chat as current
       if (chatsArray.length > 0) {
         setCurrentChatId(chatsArray[0].id);
-        loadChat(chatsArray[0].id);
+        loadChat(chatsArray[0].id, chatsArray[0].name);
       }
     } catch (err) {
       console.error('Error loading chats:', err);
@@ -59,7 +63,7 @@ function AIChat({ user, onBack }) {
   };
 
   // Load specific chat
-  const loadChat = async (chatId) => {
+  const loadChat = async (chatId, chatName) => {
     try {
       const chat = await getChat(user.uid, chatId);
       if (chat) {
@@ -71,6 +75,12 @@ function AIChat({ user, onBack }) {
             { id: 1, text: 'Start chatting with AI. Your messages will be saved.', sender: 'ai' }
           ]);
         }
+        
+        // Update URL with chat name
+        if (chatName) {
+          const urlChatName = chatName.toLowerCase().replace(/\s+/g, '-');
+          navigate(`${baseUrl}/ai-assistant/${urlChatName}`, { replace: true });
+        }
       }
     } catch (err) {
       console.error('Error loading chat:', err);
@@ -81,12 +91,15 @@ function AIChat({ user, onBack }) {
   // Create new chat
   const handleCreateNewChat = async () => {
     try {
-      const chatName = newChatName.trim() || `Chat ${chats.length + 1}`;
-      const chatId = await createChat(user.uid, chatName);
+      const chatNameInput = newChatName.trim() || `Chat ${chats.length + 1}`;
+      const chatId = await createChat(user.uid, chatNameInput);
+      
+      // Convert chat name to URL-friendly format
+      const urlChatName = chatNameInput.toLowerCase().replace(/\s+/g, '-');
       
       setChats(prev => [{
         id: chatId,
-        name: chatName,
+        name: chatNameInput,
         messages: [],
         createdAt: Date.now(),
         updatedAt: Date.now()
@@ -98,6 +111,9 @@ function AIChat({ user, onBack }) {
       setMessages([
         { id: 1, text: 'Start your conversation. Your messages will be saved automatically.', sender: 'ai' }
       ]);
+      
+      // Navigate to new chat URL
+      navigate(`${baseUrl}/ai-assistant/${urlChatName}`);
     } catch (err) {
       setError('Failed to create chat');
     }
@@ -322,7 +338,7 @@ function AIChat({ user, onBack }) {
                   <>
                     <motion.button
                       className="chat-name"
-                      onClick={() => loadChat(chat.id)}
+                      onClick={() => loadChat(chat.id, chat.name)}
                       title={chat.name}
                       whileHover={{ x: 5 }}
                     >

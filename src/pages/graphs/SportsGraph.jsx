@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { getUserGraphs, saveGraphData, updateGraphData, graphNameExists, database } from '../../firebase';
 import { ref, remove } from 'firebase/database';
 import Graph from '../../components/Graph';
+import ShareModal from '../../components/ShareModal';
 import { showSuccessAlert, showErrorAlert, showConfirmDeleteAlert } from '../../utils/alerts';
 
 function SportsGraph({ user, onBack }) {
@@ -19,6 +20,8 @@ function SportsGraph({ user, onBack }) {
   const [saving, setSaving] = useState(false);
   const [viewGraphId, setViewGraphId] = useState(null);
   const [editGraphId, setEditGraphId] = useState(null);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [currentShareGraphId, setCurrentShareGraphId] = useState(null);
 
   useEffect(() => {
     fetchGraphs();
@@ -118,7 +121,7 @@ function SportsGraph({ user, onBack }) {
     try {
       const graphData = {
         labels: preview.labels,
-        data: preview.datasets[0].data,
+        data: preview.datasets,
         type: chartType
       };
 
@@ -194,15 +197,7 @@ function SportsGraph({ user, onBack }) {
     const graph = graphs[viewGraphId];
     const chartData = {
       labels: graph.labels,
-      datasets: [
-        {
-          label: graph.name,
-          data: graph.data,
-          borderColor: '#FFE66D',
-          backgroundColor: 'rgba(255, 230, 109, 0.6)',
-          tension: 0.3
-        }
-      ]
+      datasets: graph.data
     };
 
     return (
@@ -214,6 +209,12 @@ function SportsGraph({ user, onBack }) {
         <p>Type: {graph.type.toUpperCase()}</p>
 
         <div className="graph-actions">
+          <button className="share-btn" onClick={() => {
+            setCurrentShareGraphId(viewGraphId);
+            setShareModalOpen(true);
+          }}>
+            Share
+          </button>
           <button className="edit-btn" onClick={() => {
             handleEdit(viewGraphId, graph);
             setViewGraphId(null);
@@ -341,21 +342,35 @@ function SportsGraph({ user, onBack }) {
                 <p>Created: {new Date(graph.createdAt).toLocaleDateString()}</p>
               </div>
               <div className="graph-item-actions">
-                <button className="preview-btn" onClick={() => handleViewGraph(id)}>
-                  Preview
-                </button>
-                <button className="edit-btn" onClick={() => handleEdit(id, graph)}>
-                  Edit
-                </button>
-                <button className="delete-btn" onClick={() => handleDelete(id)}>
-                  Delete
-                </button>
-              </div>
+                 <button className="preview-btn" onClick={() => handleViewGraph(id)}>
+                   Preview
+                 </button>
+                 <button className="share-btn" onClick={() => {
+                   setCurrentShareGraphId(id);
+                   setShareModalOpen(true);
+                 }}>
+                   Share
+                 </button>
+                 <button className="edit-btn" onClick={() => handleEdit(id, graph)}>
+                   Edit
+                 </button>
+                 <button className="delete-btn" onClick={() => handleDelete(id)}>
+                   Delete
+                 </button>
+               </div>
             </div>
           ))
           )}
           </div>
           )}
+
+          <ShareModal 
+          isOpen={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          graphId={currentShareGraphId}
+          graphType="sports"
+          userId={user.uid}
+          />
           </div>
           );
           }

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { getUserGraphs, saveGraphData, updateGraphData, graphNameExists, database } from '../../firebase';
 import { ref, remove } from 'firebase/database';
 import Graph from '../../components/Graph';
+import ShareModal from '../../components/ShareModal';
 import { showSuccessAlert, showErrorAlert, showConfirmDeleteAlert } from '../../utils/alerts';
 
 function WeatherGraph({ user, onBack }) {
@@ -20,6 +21,8 @@ function WeatherGraph({ user, onBack }) {
   const [saving, setSaving] = useState(false);
   const [viewGraphId, setViewGraphId] = useState(null);
   const [editGraphId, setEditGraphId] = useState(null);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [currentShareGraphId, setCurrentShareGraphId] = useState(null);
 
   const weatherMetrics = {
     temperature: 'Temperature (°C)',
@@ -127,7 +130,7 @@ function WeatherGraph({ user, onBack }) {
     try {
       const graphData = {
         labels: preview.labels,
-        data: preview.datasets[0].data,
+        data: preview.datasets,
         type: chartType,
         weatherType: weatherType
       };
@@ -204,15 +207,7 @@ function WeatherGraph({ user, onBack }) {
     const graph = graphs[viewGraphId];
     const chartData = {
       labels: graph.labels,
-      datasets: [
-        {
-          label: graph.name,
-          data: graph.data,
-          borderColor: '#A8D8EA',
-          backgroundColor: 'rgba(168, 216, 234, 0.3)',
-          tension: 0.3
-        }
-      ]
+      datasets: graph.data
     };
 
     return (
@@ -225,6 +220,12 @@ function WeatherGraph({ user, onBack }) {
         <p>Weather Type: {weatherMetrics[graph.weatherType] || 'Temperature'}</p>
 
         <div className="graph-actions">
+          <button className="share-btn" onClick={() => {
+            setCurrentShareGraphId(viewGraphId);
+            setShareModalOpen(true);
+          }}>
+            Share
+          </button>
           <button className="edit-btn" onClick={() => {
             handleEdit(viewGraphId, graph);
             setViewGraphId(null);
@@ -364,21 +365,35 @@ function WeatherGraph({ user, onBack }) {
                 <p className="graph-type">Weather Type: {graph.weatherType || 'Temperature'}</p>
               </div>
               <div className="graph-item-actions">
-                <button className="preview-btn" onClick={() => handleViewGraph(id)}>
-                  Preview
-                </button>
-                <button className="edit-btn" onClick={() => handleEdit(id, graph)}>
-                  Edit
-                </button>
-                <button className="delete-btn" onClick={() => handleDelete(id)}>
-                  Delete
-                </button>
-              </div>
+                 <button className="preview-btn" onClick={() => handleViewGraph(id)}>
+                   Preview
+                 </button>
+                 <button className="share-btn" onClick={() => {
+                   setCurrentShareGraphId(id);
+                   setShareModalOpen(true);
+                 }}>
+                   Share
+                 </button>
+                 <button className="edit-btn" onClick={() => handleEdit(id, graph)}>
+                   Edit
+                 </button>
+                 <button className="delete-btn" onClick={() => handleDelete(id)}>
+                   Delete
+                 </button>
+               </div>
             </div>
           ))
           )}
           </div>
           )}
+
+          <ShareModal 
+          isOpen={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          graphId={currentShareGraphId}
+          graphType="weather"
+          userId={user.uid}
+          />
           </div>
           );
           }

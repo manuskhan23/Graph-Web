@@ -1,63 +1,25 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { logout, getCurrentUser } from '../firebase';
 import logo from '../logo.png';
 
-function Navbar({ onLogout, onPageChange, currentPage }) {
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isMainAdmin, setIsMainAdmin] = useState(false);
-  const mainAdminEmail = 'anus2580@gmail.com';
-
-  useEffect(() => {
-    const checkAdmin = async () => {
-      const user = getCurrentUser();
-      if (!user) return;
-
-      const userEmail = user.email.toLowerCase();
-
-      // Check if main admin
-      if (userEmail === mainAdminEmail.toLowerCase()) {
-        setIsMainAdmin(true);
-        setIsAdmin(true);
-        return;
-      }
-
-      // Check if in added admins list
-      try {
-        // Dynamically import surveyDatabase to avoid circular dependency
-        const { surveyDatabase } = await import('../../survey/surveyFirebase');
-        const { ref, onValue } = await import('firebase/database');
-
-        const adminsRef = ref(surveyDatabase, 'admins');
-
-        const unsubscribe = onValue(adminsRef, (snapshot) => {
-          const admins = [];
-          snapshot.forEach((childSnapshot) => {
-            const adminEmail = childSnapshot.val().email.toLowerCase();
-            admins.push(adminEmail);
-          });
-
-          if (admins.includes(userEmail)) {
-            setIsAdmin(true);
-          }
-        }, (error) => {
-          console.error('Error checking admin status:', error);
-        });
-
-        // Cleanup subscription
-        return () => unsubscribe();
-      } catch (error) {
-        console.error('Error checking admin status:', error);
-      }
-    };
-    
-    const cleanup = checkAdmin();
-    return () => {
-      if (cleanup && typeof cleanup === 'function') {
-        cleanup();
-      }
-    };
-  }, []);
+function Navbar({ onLogout, isAdmin: userIsAdmin }) {
+  const navigate = useNavigate();
+  const { username, adminname } = useParams();
+  
+  // Determine baseUrl based on route and admin status
+  let baseUrl;
+  if (adminname) {
+    baseUrl = `/admin/${adminname}`;
+  } else if (username) {
+    // If in /user route but user is admin, should navigate to /admin instead
+    baseUrl = userIsAdmin ? `/admin/${username}` : `/user/${username}`;
+  } else {
+    baseUrl = `/`;
+  }
+  
+  // Admin status is passed via props, no need to check here
 
   const handleLogout = async () => {
     try {
@@ -70,16 +32,16 @@ function Navbar({ onLogout, onPageChange, currentPage }) {
   };
 
   const navItems = [
-    { label: 'Home', page: 'home' },
-    { label: 'AI Assistant', page: 'ai-chat' },
-    { label: 'Calculator', page: 'calculator' },
-    { label: 'Survey Form', page: 'survey-form' },
+    { label: 'Home', path: baseUrl },
+    { label: 'AI Assistant', path: `${baseUrl}/ai-assistant/default` },
+    { label: 'Calculator', path: `${baseUrl}/calculator` },
+    { label: 'Survey Form', path: `${baseUrl}/survey-form` },
+    { label: 'Survey Graph', path: `${baseUrl}/survey-graph` },
   ];
 
   const adminItems = [
-    { label: 'Survey Graph', page: 'survey-graph' },
-    { label: 'Admin Dashboard', page: 'admin-dashboard' },
-    { label: 'Manage Admins', page: 'admin-manager' },
+    { label: 'Admin Dashboard', path: `${baseUrl}/admin-dashboard` },
+    { label: 'Manage Admins', path: `${baseUrl}/manage-admins` },
   ];
 
   return (
@@ -114,35 +76,35 @@ function Navbar({ onLogout, onPageChange, currentPage }) {
             transition={{ staggerChildren: 0.1, delayChildren: 0.2 }}
            >
              {navItems.map((item) => (
-              <motion.button
-                key={item.page}
-                className={`nav-link ${currentPage === item.page ? 'active' : ''}`}
-                onClick={() => onPageChange(item.page)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                {item.label}
-              </motion.button>
-            ))}
-            {isAdmin && (
-              <>
-                {adminItems.map((item) => (
-                  <motion.button
-                    key={item.page}
-                    className={`nav-link ${currentPage === item.page ? 'active' : ''}`}
-                    onClick={() => onPageChange(item.page)}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                  >
-                    {item.label}
-                  </motion.button>
-                ))}
-              </>
-            )}
+               <motion.button
+                 key={item.label}
+                 className="nav-link"
+                 onClick={() => navigate(item.path)}
+                 whileHover={{ scale: 1.05 }}
+                 whileTap={{ scale: 0.95 }}
+                 initial={{ opacity: 0, y: -10 }}
+                 animate={{ opacity: 1, y: 0 }}
+               >
+                 {item.label}
+               </motion.button>
+             ))}
+             {userIsAdmin && (
+               <>
+                 {adminItems.map((item) => (
+                   <motion.button
+                     key={item.label}
+                     className="nav-link"
+                     onClick={() => navigate(item.path)}
+                     whileHover={{ scale: 1.05 }}
+                     whileTap={{ scale: 0.95 }}
+                     initial={{ opacity: 0, y: -10 }}
+                     animate={{ opacity: 1, y: 0 }}
+                   >
+                     {item.label}
+                   </motion.button>
+                 ))}
+               </>
+             )}
             <motion.button 
               onClick={handleLogout} 
               className="btn btn-danger btn-sm ms-2"

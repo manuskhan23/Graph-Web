@@ -6,7 +6,8 @@ import {
   signOut,
   onAuthStateChanged,
   setPersistence,
-  browserLocalPersistence
+  browserLocalPersistence,
+  updateProfile
 } from "firebase/auth";
 import {
   getDatabase,
@@ -42,20 +43,68 @@ setPersistence(auth, browserLocalPersistence).catch((err) => {
   console.warn('Failed to set persistence', err);
 });
 
+// ✅ Helper: Generate unique username
+async function generateUniqueUsername(name) {
+  let baseUsername = name.toLowerCase().replace(/\s+/g, '-');
+  let username = baseUsername;
+  let counter = 1;
+  
+  // Check if username exists
+  while (true) {
+    const snapshot = await get(ref(database, `usernames/${username}`));
+    if (!snapshot.exists()) {
+      return username;
+    }
+    username = `${baseUsername}-${counter}`;
+    counter++;
+  }
+}
+
 // ✅ Signup
 export async function signup(email, password, name) {
   try {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     const uid = cred.user.uid;
     
+    // Generate unique username
+    const username = await generateUniqueUsername(name);
+    
+    // Set displayName in Firebase Auth
+    await updateProfile(cred.user, { displayName: username });
+    
+    // Check if user is main admin
+    const mainAdminEmail = 'anus2580@gmail.com';
+    const isAdmin = email.toLowerCase() === mainAdminEmail.toLowerCase();
+    
+    // Save to database
     await set(ref(database, `users/${uid}`), {
-      email:  email,
+      uid: uid,
+      email: email,
       name: name,
+      username: username,
+      isAdmin: isAdmin,
       createdAt: serverTimestamp()
     });
     
+    // Reserve username in global index
+    await set(ref(database, `usernames/${username}`), uid);
+    
+    // Store admin status in Firebase Auth custom claims if available
+    if (isAdmin) {
+      cred.user.isAdmin = true;
+    }
+    
     return uid;
   } catch (error) {
+    // If email already exists, try to login instead
+    if (error.code === 'auth/email-already-in-use') {
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        return auth.currentUser.uid;
+      } catch (loginError) {
+        throw new Error('Email already in use. Please login with your password or use a different email.');
+      }
+    }
     throw error;
   }
 }
@@ -83,6 +132,30 @@ export function getCurrentUser() {
   return auth.currentUser;
 }
 
+// ✅ Ensure user has username (migration for old accounts)
+export async function ensureUsername(uid) {
+  try {
+    const userData = await getUserData(uid);
+    
+    // If username exists, return it
+    if (userData && userData.username) {
+      return userData.username;
+    }
+    
+    // If no username, create one from uid (first 10 chars)
+    if (userData) {
+      const username = `user-${uid.substring(0, 8)}`;
+      await set(ref(database, `users/${uid}/username`), username);
+      return username;
+    }
+    
+    return uid;
+  } catch (error) {
+    console.error('Error ensuring username:', error);
+    return uid;
+  }
+}
+
 // ✅ Fetch user profile data
 export async function getUserData(uid) {
   try {
@@ -91,6 +164,17 @@ export async function getUserData(uid) {
   } catch (error) {
     console.error('Error fetching user data:', error);
     throw error;
+  }
+}
+
+// ✅ Check if user is admin
+export async function isUserAdmin(uid) {
+  try {
+    const userData = await getUserData(uid);
+    return userData && userData.isAdmin === true;
+  } catch (error) {
+    console.error('Error checking admin status:', error);
+    return false;
   }
 }
 
@@ -115,14 +199,25 @@ export async function saveGraphData(uid, graphType, graphName, graphData) {
       // Multi-dataset format (Education graphs)
       data = graphData.datasets;
     } else if (graphData.data) {
-      // Single dataset format
-      data = Array.isArray(graphData.data) 
-        ? graphData.data.filter(d => d !== null && d !== undefined && !isNaN(d))
-        : [];
+      // Check if data is array of dataset objects or array of numbers
+      if (Array.isArray(graphData.data)) {
+        if (graphData.data.length > 0 && typeof graphData.data[0] === 'object') {
+          // Array of dataset objects - don't filter
+          data = graphData.data;
+        } else {
+          // Array of numbers - filter
+          data = graphData.data.filter(d => d !== null && d !== undefined && !isNaN(d));
+        }
+      }
     }
 
     if (labels.length === 0) {
       throw new Error('Labels cannot be empty');
+    }
+
+    // Ensure data is not empty
+    if (data.length === 0) {
+      throw new Error('No valid data provided');
     }
 
     // Build clean graph object
@@ -139,9 +234,8 @@ export async function saveGraphData(uid, graphType, graphName, graphData) {
     if (graphData.metric) {
       cleanGraphData.metric = graphData.metric;
     }
-    if (graphData.datasets) {
-      cleanGraphData.datasets = graphData.datasets;
-    }
+    // Always add datasets for consistency
+    cleanGraphData.datasets = data;
 
     // Save to Firebase
     await set(ref(database, `graphs/${uid}/${graphType}/${graphId}`), cleanGraphData);
@@ -200,20 +294,36 @@ export async function getGraph(uid, graphType, graphId) {
 // ✅ Update graph
 export async function updateGraphData(uid, graphType, graphId, graphName, graphData) {
   try {
+    // Get existing graph to preserve createdAt
+    const existingGraph = await getGraph(uid, graphType, graphId);
+    
+    // Handle data - same logic as saveGraphData
+    let data = [];
+    if (graphData.datasets) {
+      data = graphData.datasets;
+    } else if (graphData.data) {
+      if (Array.isArray(graphData.data)) {
+        if (graphData.data.length > 0 && typeof graphData.data[0] === 'object') {
+          data = graphData.data;
+        } else {
+          data = graphData.data.filter(d => d !== null && d !== undefined && !isNaN(d));
+        }
+      }
+    }
+    
     const cleanGraphData = {
       name: graphName || 'Untitled Graph',
       type: graphData.type || 'line',
       labels: graphData.labels || [],
-      data: graphData.data || [],
+      data: data,
+      datasets: data,
+      createdAt: existingGraph?.createdAt || serverTimestamp(),
       updatedAt: serverTimestamp()
     };
 
     // Add optional fields if they exist
     if (graphData.metric) {
       cleanGraphData.metric = graphData.metric;
-    }
-    if (graphData.datasets) {
-      cleanGraphData.datasets = graphData.datasets;
     }
     if (graphData.weatherType) {
       cleanGraphData.weatherType = graphData.weatherType;
@@ -427,6 +537,140 @@ export async function clearAllCalculatorHistory(uid) {
     await remove(ref(database, `calculatorHistory/${uid}`));
   } catch (error) {
     console.error('Error clearing calculator history:', error);
+    throw error;
+  }
+}
+
+// ✅ Shareable Graph Functions
+
+// Generate unique share code for a graph
+function generateShareCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 24; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+// Share a graph with public/private access
+export async function shareGraph(uid, graphType, graphId, isPublic = false) {
+  try {
+    const shareCode = generateShareCode();
+    const shareData = {
+      shareCode: shareCode,
+      ownerUid: uid,
+      graphType: graphType,
+      graphId: graphId,
+      isPublic: isPublic,
+      createdAt: serverTimestamp()
+    };
+    
+    await set(ref(database, `sharedGraphs/${shareCode}`), shareData);
+    return shareCode;
+  } catch (error) {
+    console.error('Error sharing graph:', error);
+    throw error;
+  }
+}
+
+// Get shared graph by share code
+export async function getSharedGraph(shareCode) {
+  try {
+    const snapshot = await get(ref(database, `sharedGraphs/${shareCode}`));
+    if (!snapshot.exists()) {
+      return null; // Graph not found
+    }
+    
+    const shareData = snapshot.val();
+    const graphData = await getGraph(shareData.ownerUid, shareData.graphType, shareData.graphId);
+    
+    if (!graphData) {
+      return null; // Graph doesn't exist anymore
+    }
+    
+    return {
+      graph: graphData,
+      shareCode: shareCode,
+      isPublic: shareData.isPublic,
+      ownerUid: shareData.ownerUid,
+      graphType: shareData.graphType
+    };
+  } catch (error) {
+    console.error('Error fetching shared graph:', error);
+    throw error;
+  }
+}
+
+// Get all share codes for a graph
+export async function getGraphShareCodes(uid, graphType, graphId) {
+  try {
+    const snapshot = await get(ref(database, 'sharedGraphs'));
+    if (!snapshot.exists()) {
+      return [];
+    }
+    
+    const allShares = snapshot.val();
+    const graphShares = [];
+    
+    for (const [shareCode, shareData] of Object.entries(allShares)) {
+      if (shareData.ownerUid === uid && 
+          shareData.graphType === graphType && 
+          shareData.graphId === graphId) {
+        graphShares.push({
+          shareCode: shareCode,
+          isPublic: shareData.isPublic,
+          createdAt: shareData.createdAt
+        });
+      }
+    }
+    
+    return graphShares;
+  } catch (error) {
+    console.error('Error fetching graph share codes:', error);
+    throw error;
+  }
+}
+
+// Revoke share code
+export async function revokeShareCode(shareCode) {
+  try {
+    const { remove } = await import('firebase/database');
+    await remove(ref(database, `sharedGraphs/${shareCode}`));
+  } catch (error) {
+    console.error('Error revoking share code:', error);
+    throw error;
+  }
+}
+
+// Update graph visibility (public/private)
+export async function updateShareVisibility(shareCode, isPublic) {
+  try {
+    await set(ref(database, `sharedGraphs/${shareCode}/isPublic`), isPublic);
+  } catch (error) {
+    console.error('Error updating share visibility:', error);
+    throw error;
+  }
+}
+
+// Save contact message
+export async function saveContactMessage(name, email, subject, message) {
+  try {
+    const messageId = Date.now().toString();
+    const contactData = {
+      messageId: messageId,
+      name: name.trim(),
+      email: email.trim(),
+      subject: subject.trim(),
+      message: message.trim(),
+      createdAt: serverTimestamp(),
+      status: 'new'
+    };
+    
+    await set(ref(database, `contactMessages/${messageId}`), contactData);
+    return messageId;
+  } catch (error) {
+    console.error('Error saving contact message:', error);
     throw error;
   }
 }

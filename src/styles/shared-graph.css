@@ -1,0 +1,415 @@
+/* Shared Graph View */
+.shared-graph-container {
+  width: 100%;
+  padding: 40px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: calc(100vh - 200px);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.shared-graph-container > * {
+  width: 100%;
+  max-width: 1200px;
+}
+
+.shared-graph-header {
+  text-align: center;
+  margin-bottom: 40px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 30px;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.shared-graph-header h1 {
+  font-size: 2.5em;
+  margin: 0 0 10px 0;
+  font-weight: bold;
+}
+
+.graph-meta {
+  font-size: 0.95em;
+  opacity: 0.9;
+  margin: 10px 0;
+}
+
+.graph-meta .divider {
+  margin: 0 10px;
+}
+
+.read-only-badge {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.85em;
+  margin-top: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.shared-graph-display {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  margin-bottom: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.share-info {
+  text-align: center;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.copy-link-btn {
+  padding: 12px 24px;
+  background: #4ECDC4;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1em;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  margin-bottom: 15px;
+}
+
+.copy-link-btn:hover {
+  background: #3db8b0;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.share-note {
+  font-size: 0.9em;
+  opacity: 0.85;
+  margin: 0;
+}
+
+.loading-message {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 60px 40px;
+  border-radius: 12px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(100, 200, 255, 0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-message p {
+  margin: 0;
+  font-size: 1.2em;
+}
+
+.error-message {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 40px;
+  border-radius: 12px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 100, 100, 0.3);
+}
+
+.error-message h2 {
+  font-size: 2em;
+  margin: 0 0 15px 0;
+}
+
+.error-message p {
+  font-size: 1.1em;
+  margin: 0 0 25px 0;
+}
+
+.error-message a {
+  display: inline-block;
+  padding: 12px 30px;
+  background: #4ECDC4;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.error-message a:hover {
+  background: #3db8b0;
+  transform: translateY(-2px);
+}
+
+/* Modal Styles for Share */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #333;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover {
+  color: #000;
+}
+
+.modal-content h2 {
+  color: #333;
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.8em;
+}
+
+.modal-content h3 {
+  color: #555;
+  font-size: 1.2em;
+  margin-top: 25px;
+  margin-bottom: 15px;
+}
+
+.share-buttons {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.public-share-btn,
+.private-share-btn {
+  width: 100%;
+  padding: 15px;
+  margin-bottom: 10px;
+  border: 2px solid #4ECDC4;
+  background: white;
+  color: #4ECDC4;
+  border-radius: 8px;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.public-share-btn:hover,
+.private-share-btn:hover {
+  background: #4ECDC4;
+  color: white;
+  transform: translateY(-2px);
+}
+
+.share-desc {
+  color: #777;
+  font-size: 0.85em;
+  margin: 8px 0;
+}
+
+.no-shares {
+  color: #999;
+  text-align: center;
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  font-style: italic;
+}
+
+.share-codes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.share-code-item {
+  background: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 4px solid #4ECDC4;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+}
+
+.share-code-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.visibility-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75em;
+  font-weight: 600;
+}
+
+.visibility-badge.public {
+  background: #d4f1f4;
+  color: #0a9396;
+}
+
+.visibility-badge.private {
+  background: #ffe5e5;
+  color: #d63031;
+}
+
+.share-code-item code {
+  background: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.85em;
+  color: #333;
+  border: 1px solid #ddd;
+}
+
+.share-code-item small {
+  color: #999;
+  font-size: 0.8em;
+}
+
+.share-code-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.copy-btn,
+.revoke-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85em;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.copy-btn {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #2e7d32;
+}
+
+.copy-btn:hover {
+  background: #2e7d32;
+  color: white;
+}
+
+.revoke-btn {
+  background: #ffebee;
+  color: #d63031;
+  border: 1px solid #d63031;
+}
+
+.revoke-btn:hover {
+  background: #d63031;
+  color: white;
+}
+
+/* Share button styling */
+.share-btn {
+  background: #4ECDC4;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  font-size: 0.95em;
+}
+
+.share-btn:hover {
+  background: #3db8b0;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 600px) {
+  .shared-graph-container {
+    padding: 20px 10px;
+  }
+
+  .shared-graph-header {
+    padding: 20px;
+  }
+
+  .shared-graph-header h1 {
+    font-size: 1.8em;
+  }
+
+  .shared-graph-display {
+    padding: 20px;
+  }
+
+  .modal-content {
+    width: 95%;
+    padding: 20px;
+  }
+
+  .share-code-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .share-code-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .toggle-btn,
+  .revoke-btn {
+    width: 100%;
+  }
+}

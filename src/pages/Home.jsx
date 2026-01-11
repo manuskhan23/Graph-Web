@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getUserData } from '../firebase';
 
-function Home({ onSelectCategory }) {
+function Home({ onSelectCategory, isAdmin }) {
+  const navigate = useNavigate();
+  const { username, adminname } = useParams();
+  const baseUrl = adminname ? `/admin/${adminname}` : `/user/${username}`;
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -156,8 +160,8 @@ function Home({ onSelectCategory }) {
           >
             <motion.div
               className="category-card h-100"
-              style={{ borderTop: `4px solid ${cat.color}` }}
-              onClick={() => onSelectCategory(cat.id)}
+              style={{ borderTop: `4px solid ${cat.color}`, cursor: 'pointer' }}
+              onClick={() => navigate(`${baseUrl}/${cat.id}/${cat.id}`)}
               variants={cardVariants}
               whileHover="hover"
               whileTap={{ scale: 0.98 }}

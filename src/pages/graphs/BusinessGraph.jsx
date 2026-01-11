@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Swal from 'sweetalert2';
-import { getUserGraphs, saveGraphData, updateGraphData, graphNameExists, database, set, ref } from '../../firebase';
+import { getUserGraphs, saveGraphData, updateGraphData, graphNameExists, database, set, ref, shareGraph, getGraphShareCodes, revokeShareCode } from '../../firebase';
 import { remove } from 'firebase/database';
 import Graph from '../../components/Graph';
 
@@ -20,6 +20,10 @@ function BusinessGraph({ user, onBack }) {
   const [saving, setSaving] = useState(false);
   const [viewGraphId, setViewGraphId] = useState(null);
   const [editGraphId, setEditGraphId] = useState(null);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [currentShareGraphId, setCurrentShareGraphId] = useState(null);
+  const [shareCodes, setShareCodes] = useState([]);
+  const [loadingShares, setLoadingShares] = useState(false);
 
   const metrics = {
     revenue: '💰 Revenue',
@@ -126,7 +130,7 @@ function BusinessGraph({ user, onBack }) {
     try {
       const graphData = {
         labels: preview.labels || [],
-        data: preview.datasets[0].data || [],
+        data: preview.datasets,
         type: chartType,
         metric: metric
       };
@@ -238,21 +242,100 @@ function BusinessGraph({ user, onBack }) {
     setViewGraphId(graphId);
   };
 
+  const handleOpenShareModal = async (graphId) => {
+    setCurrentShareGraphId(graphId);
+    setShareModalOpen(true);
+    setLoadingShares(true);
+    
+    try {
+      const codes = await getGraphShareCodes(user.uid, 'business', graphId);
+      setShareCodes(codes);
+    } catch (err) {
+      console.error('Error fetching share codes:', err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to load share codes'
+      });
+    } finally {
+      setLoadingShares(false);
+    }
+  };
+
+  const handleCreateShare = async (isPublic) => {
+    if (!currentShareGraphId) return;
+
+    try {
+      const code = await shareGraph(user.uid, 'business', currentShareGraphId, isPublic);
+      setShareCodes([...shareCodes, {
+        shareCode: code,
+        isPublic: isPublic,
+        createdAt: new Date().toISOString()
+      }]);
+      
+      Swal.fire({
+        icon: 'success',
+        title: 'Share Link Created!',
+        html: `
+          <div style="text-align: left; margin: 15px 0;">
+            <p><strong>Share Code:</strong></p>
+            <code style="background: #f0f0f0; padding: 8px; border-radius: 4px; display: block; word-break: break-all;">${code}</code>
+            <p style="margin-top: 10px;"><strong>Full Link:</strong></p>
+            <code style="background: #f0f0f0; padding: 8px; border-radius: 4px; display: block; word-break: break-all;">${window.location.origin}/?share=${code}&type=business</code>
+            <p style="margin-top: 10px; font-size: 12px;">
+              ${isPublic ? '🌐 This graph is PUBLIC - anyone with the link can view it' : '🔒 This graph is PRIVATE - only shared links work'}
+            </p>
+          </div>
+        `,
+        confirmButtonText: 'Copy & Close'
+      }).then(() => {
+        navigator.clipboard.writeText(`${window.location.origin}/?share=${code}&type=business`);
+      });
+    } catch (err) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to create share link: ' + err.message
+      });
+    }
+  };
+
+  const handleRevokeShare = async (shareCode) => {
+    const result = await Swal.fire({
+      title: 'Revoke Share Link?',
+      text: 'This share link will no longer work',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      confirmButtonText: 'Yes, revoke it!'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await revokeShareCode(shareCode);
+        setShareCodes(shareCodes.filter(s => s.shareCode !== shareCode));
+        Swal.fire({
+          icon: 'success',
+          title: 'Revoked!',
+          text: 'Share link has been revoked'
+        });
+      } catch (err) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'Failed to revoke share link'
+        });
+      }
+    }
+  };
+
   const graphCount = Object.keys(graphs).length;
 
   if (viewGraphId && graphs[viewGraphId]) {
     const graph = graphs[viewGraphId];
     const chartData = {
       labels: graph.labels,
-      datasets: [
-        {
-          label: graph.name,
-          data: graph.data,
-          borderColor: '#FF6B6B',
-          backgroundColor: 'rgba(255, 107, 107, 0.3)',
-          tension: 0.3
-        }
-      ]
+      datasets: graph.data
     };
 
     return (
@@ -265,6 +348,9 @@ function BusinessGraph({ user, onBack }) {
         <p>💰 Metric: {metrics[graph.metric] || 'Revenue'}</p>
 
         <div className="graph-actions">
+          <button className="share-btn" onClick={() => handleOpenShareModal(viewGraphId)}>
+            Share
+          </button>
           <button className="edit-btn" onClick={() => {
             handleEdit(viewGraphId, graph);
             setViewGraphId(null);
@@ -402,23 +488,91 @@ function BusinessGraph({ user, onBack }) {
                   <p className="graph-type">Metric: {graph.metric || 'Revenue'}</p>
                 </div>
                 <div className="graph-item-actions">
-                  <button className="preview-btn" onClick={() => handleViewGraph(id)}>
-                    👁️ Preview
-                  </button>
-                  <button className="edit-btn" onClick={() => handleEdit(id, graph)}>
-                    ✏️ Edit
-                  </button>
-                  <button className="delete-btn" onClick={() => handleDelete(id)}>
-                    🗑️ Delete
-                  </button>
-                </div>
+                   <button className="preview-btn" onClick={() => handleViewGraph(id)}>
+                     👁️ Preview
+                   </button>
+                   <button className="share-btn" onClick={() => handleOpenShareModal(id)}>
+                     Share
+                   </button>
+                   <button className="edit-btn" onClick={() => handleEdit(id, graph)}>
+                     ✏️ Edit
+                   </button>
+                   <button className="delete-btn" onClick={() => handleDelete(id)}>
+                     🗑️ Delete
+                   </button>
+                 </div>
               </div>
             ))
           )}
         </div>
       )}
+
+      {/* Share Modal */}
+      {shareModalOpen && (
+       <div className="modal-overlay" onClick={() => setShareModalOpen(false)}>
+         <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+           <button className="modal-close" onClick={() => setShareModalOpen(false)}>×</button>
+           <h2>Share Graph</h2>
+           
+           <div className="share-buttons">
+             <button 
+               className="public-share-btn"
+               onClick={() => handleCreateShare(true)}
+             >
+               🌐 Create Public Link
+             </button>
+             <p className="share-desc">Anyone with the link can view (read-only)</p>
+           </div>
+
+           <h3>Existing Share Links</h3>
+           {loadingShares ? (
+             <p>Loading share codes...</p>
+           ) : shareCodes.length === 0 ? (
+             <p className="no-shares">No share links created yet</p>
+           ) : (
+             <div className="share-codes-list">
+               {shareCodes.map((share) => (
+                 <div key={share.shareCode} className="share-code-item">
+                   <div className="share-code-info">
+                     <span className={`visibility-badge ${share.isPublic ? 'public' : 'private'}`}>
+                       {share.isPublic ? '🌐 PUBLIC' : '🔒 PRIVATE'}
+                     </span>
+                     <code>{share.shareCode.substring(0, 12)}...</code>
+                     <small>{new Date(share.createdAt).toLocaleDateString()}</small>
+                   </div>
+                   <div className="share-code-actions">
+                     <button 
+                       className="copy-btn"
+                       onClick={() => {
+                         const url = `${window.location.origin}/?share=${share.shareCode}&type=business`;
+                         navigator.clipboard.writeText(url);
+                         Swal.fire({
+                           icon: 'success',
+                           title: 'Copied!',
+                           text: 'Share link copied to clipboard',
+                           timer: 1500,
+                           showConfirmButton: false
+                         });
+                       }}
+                     >
+                       Copy Link
+                     </button>
+                     <button 
+                       className="revoke-btn"
+                       onClick={() => handleRevokeShare(share.shareCode)}
+                     >
+                       Revoke
+                     </button>
+                   </div>
+                 </div>
+               ))}
+             </div>
+           )}
+         </div>
+       </div>
+      )}
       </div>
       );
       }
 
-export default BusinessGraph;
+      export default BusinessGraph;

@@ -413,3 +413,68 @@
     width: 100%;
   }
 }
+
+/* Expression Graph Specific Styles */
+.advanced-section {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  border-left: 4px solid #4F46E5;
+  margin: 20px 0;
+}
+
+.advanced-section h3 {
+  color: #4F46E5;
+  margin-top: 0;
+  margin-bottom: 15px;
+}
+
+.advanced-section p {
+  color: #666;
+  font-size: 0.9em;
+  margin: 8px 0;
+}
+
+.advanced-section textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 0.95em;
+  resize: vertical;
+  background: white;
+  color: #333;
+}
+
+.advanced-section textarea:focus {
+  outline: none;
+  border-color: #4F46E5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.next-btn,
+.back-step-btn,
+.cancel-btn {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95em;
+  transition: all 0.3s ease;
+}
+
+.next-btn:hover,
+.back-step-btn:hover,
+.cancel-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.back-step-btn,
+.cancel-btn {
+  margin-right: 10px;
+}

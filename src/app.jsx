@@ -229,7 +229,7 @@ function AppRoutes() {
 
         {/* Graph Routes */}
         <Route
-          path=":graphType/:graphName"
+          path=":graphType/*"
           element={
             <ProtectedRoute user={user} loading={loading}>
               <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
@@ -348,7 +348,7 @@ function AppRoutes() {
 
         {/* Graph Routes */}
         <Route
-          path=":graphType/:graphName"
+          path=":graphType/*"
           element={
             <ProtectedRoute user={user} loading={loading}>
               <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>

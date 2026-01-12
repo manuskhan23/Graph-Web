@@ -64,6 +64,12 @@ function Home({ onSelectCategory, isAdmin }) {
       name: 'Web Analytics', 
       description: 'Traffic, conversion, engagement',
       color: '#AA96DA'
+    },
+    { 
+      id: 'expression', 
+      name: 'Expression Graphs', 
+      description: 'Visualize mathematical functions and expressions',
+      color: '#4F46E5'
     }
   ];
 
@@ -161,7 +167,7 @@ function Home({ onSelectCategory, isAdmin }) {
             <motion.div
               className="category-card h-100"
               style={{ borderTop: `4px solid ${cat.color}`, cursor: 'pointer' }}
-              onClick={() => navigate(`${baseUrl}/${cat.id}/${cat.id}`)}
+              onClick={() => navigate(`${baseUrl}/${cat.id}`)}
               variants={cardVariants}
               whileHover="hover"
               whileTap={{ scale: 0.98 }}

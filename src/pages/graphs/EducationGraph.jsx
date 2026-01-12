@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate, useParams } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { getUserGraphs, saveGraphData, updateGraphData, graphNameExists, database, shareGraph, getGraphShareCodes, revokeShareCode } from '../../firebase';
 import { ref, remove } from 'firebase/database';
 import Graph from '../../components/Graph';
 
-function EducationGraph({ user, onBack }) {
+function EducationGraph({ user, onBack, graphName, action }) {
+  const navigate = useNavigate();
+  const { username, adminname } = useParams();
+  const baseUrl = adminname ? `/admin/${adminname}` : `/user/${username}`;
+  
   const [graphs, setGraphs] = useState({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -29,6 +34,35 @@ function EducationGraph({ user, onBack }) {
     setViewGraphId(null);
     setShowForm(false);
   }, [user]);
+
+  // Handle graphName and action from URL
+  useEffect(() => {
+    if (!graphName) {
+      // No graph selected
+      setEditGraphId(null);
+      setViewGraphId(null);
+      setShowForm(false);
+    } else if (graphName === 'new') {
+      // Create new graph
+      setShowForm(true);
+      setReportName('');
+      setFormData([{ name: '', firstResult: '', secondResult: '' }]);
+      setEditGraphId(null);
+      setViewGraphId(null);
+    } else if (graphs[graphName]) {
+      // Load existing graph
+      if (action === 'edit') {
+        setEditGraphId(graphName);
+        setShowForm(true);
+      } else if (action === 'preview') {
+        setViewGraphId(graphName);
+        setShowForm(false);
+      } else {
+        setViewGraphId(graphName);
+        setShowForm(false);
+      }
+    }
+  }, [graphName, action, graphs, navigate, baseUrl]);
 
   const fetchGraphs = async () => {
     try {

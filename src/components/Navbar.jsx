@@ -36,10 +36,10 @@ function Navbar({ onLogout, isAdmin: userIsAdmin }) {
     { label: 'AI Assistant', path: `${baseUrl}/ai-assistant/default` },
     { label: 'Calculator', path: `${baseUrl}/calculator` },
     { label: 'Survey Form', path: `${baseUrl}/survey-form` },
-    { label: 'Survey Graph', path: `${baseUrl}/survey-graph` },
   ];
 
   const adminItems = [
+    { label: 'Survey Graph', path: `${baseUrl}/survey-graph` },
     { label: 'Admin Dashboard', path: `${baseUrl}/admin-dashboard` },
     { label: 'Manage Admins', path: `${baseUrl}/manage-admins` },
   ];

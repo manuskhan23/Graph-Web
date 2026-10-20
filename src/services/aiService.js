@@ -1,7 +1,7 @@
 // Use environment variable or default to localhost
 const LOCAL_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_MODEL = 'openai/gpt-oss-120b';
 
 // Try local backend first, fallback to Groq API
 export async function sendMessage(message) {
@@ -44,7 +44,10 @@ export async function sendMessage(message) {
       },
       body: JSON.stringify({
         model: GROQ_MODEL,
-        messages: [{ role: 'user', content: message }],
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant in a chat interface that fully renders Markdown. Always respond using well-formatted Markdown: use headings for sections, **bold** for key terms, bullet/numbered lists, tables (with | columns |) for structured or comparison data, and fenced code blocks for code or examples. Structure answers so they are easy to scan.' },
+          { role: 'user', content: message }
+        ],
         temperature: 0.7,
         max_tokens: 1024
       })

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { sendMessage } from '../services/aiService';
 import { createChat, getUserChats, getChat, saveMessageToChat, deleteChat, updateChatName } from '../firebase';
 import '../styles/aichat.css';
@@ -419,11 +420,33 @@ function AIChat({ user, onBack }) {
               <div className={`message-content ${msg.sender}`}>
                 {msg.sender === 'ai' ? (
                   <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
                     components={{
                       p: ({node, ...props}) => <p style={{ marginBottom: '10px' }} {...props} />,
-                      ul: ({node, ...props}) => <ul style={{ marginLeft: '20px', marginBottom: '10px' }} {...props} />,
+                      ul: ({node, ...props}) => <ul style={{ marginLeft: '20px', marginBottom: '10px', listStyleType: 'disc' }} {...props} />,
                       ol: ({node, ...props}) => <ol style={{ marginLeft: '20px', marginBottom: '10px' }} {...props} />,
                       li: ({node, ...props}) => <li style={{ marginBottom: '5px' }} {...props} />,
+                      h1: ({node, ...props}) => <h1 style={{ fontSize: '1.5em', margin: '12px 0 8px', fontWeight: 700 }} {...props} />,
+                      h2: ({node, ...props}) => <h2 style={{ fontSize: '1.3em', margin: '12px 0 8px', fontWeight: 700 }} {...props} />,
+                      h3: ({node, ...props}) => <h3 style={{ fontSize: '1.15em', margin: '10px 0 6px', fontWeight: 600 }} {...props} />,
+                      table: ({node, ...props}) => (
+                        <div style={{ overflowX: 'auto', margin: '10px 0' }}>
+                          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.95em' }} {...props} />
+                        </div>
+                      ),
+                      th: ({node, ...props}) => <th style={{ border: '1px solid rgba(255,255,255,0.25)', padding: '6px 10px', textAlign: 'left', fontWeight: 700, background: 'rgba(102, 126, 234, 0.25)' }} {...props} />,
+                      td: ({node, ...props}) => <td style={{ border: '1px solid rgba(255,255,255,0.2)', padding: '6px 10px' }} {...props} />,
+                      blockquote: ({node, ...props}) => <blockquote style={{ borderLeft: '3px solid rgba(102, 126, 234, 0.6)', marginLeft: 0, paddingLeft: '12px', color: 'inherit', opacity: 0.9 }} {...props} />,
+                      a: ({node, ...props}) => <a style={{ color: '#8ea2ff', textDecoration: 'underline' }} target="_blank" rel="noopener noreferrer" {...props} />,
+                      code: ({node, className, children, ...props}) => {
+                        const isBlock = /language-/.test(className || '') || String(children).includes('\n');
+                        return isBlock ? (
+                          <code style={{ display: 'block', background: 'rgba(0,0,0,0.35)', padding: '10px 12px', borderRadius: '6px', overflowX: 'auto', fontFamily: 'Consolas, Monaco, monospace', fontSize: '0.9em', whiteSpace: 'pre', margin: '8px 0' }} className={className} {...props}>{children}</code>
+                        ) : (
+                          <code style={{ background: 'rgba(0,0,0,0.25)', padding: '2px 5px', borderRadius: '4px', fontFamily: 'Consolas, Monaco, monospace', fontSize: '0.9em' }} className={className} {...props}>{children}</code>
+                        );
+                      },
+                      pre: ({node, children, ...props}) => <pre style={{ margin: 0 }} {...props}>{children}</pre>,
                     }}
                   >
                     {msg.text}

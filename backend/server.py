@@ -60,8 +60,9 @@ def chat():
                 "Content-Type": "application/json"
             }
             payload = {
-                "model": "llama-3.3-70b-versatile",
+                "model": "openai/gpt-oss-120b",
                 "messages": [
+                    {"role": "system", "content": "You are a helpful assistant in a chat interface that fully renders Markdown. Always respond using well-formatted Markdown: use headings for sections, **bold** for key terms, bullet/numbered lists, tables (with | columns |) for structured or comparison data, and fenced code blocks for code or examples. Structure answers so they are easy to scan."},
                     {"role": "user", "content": user_message}
                 ],
                 "temperature": 0.7,
@@ -117,7 +118,7 @@ def index():
         'message': 'MyGraph AI Backend Server',
         'version': '2.0',
         'ai_service': 'Groq API',
-        'model': 'llama-3.3-70b-versatile',
+        'model': 'openai/gpt-oss-120b',
         'status': 'running' if GROQ_API_KEY else 'API key missing'
     }), 200
 

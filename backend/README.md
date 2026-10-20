@@ -10,7 +10,7 @@ pip install -r requirements.txt
 ### 2. Configure API Key
 Make sure your `.env` file contains:
 ```
-GEMINI_API_KEY=AIzaSyDguUn-cPJyFZH1OO0Ozi5iby-PonTe3LY
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 ### 3. Run the Server

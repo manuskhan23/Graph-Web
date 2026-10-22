@@ -4,6 +4,7 @@ import Swal from 'sweetalert2';
 import { getUserGraphs, saveGraphData, updateGraphData, graphNameExists, database, set, ref, shareGraph, getGraphShareCodes, revokeShareCode } from '../../firebase';
 import { remove } from 'firebase/database';
 import Graph from '../../components/Graph';
+import PrivateLinkSection from '../../components/PrivateLinkSection';
 
 function BusinessGraph({ user, onBack }) {
   const [graphs, setGraphs] = useState({});
@@ -568,6 +569,12 @@ function BusinessGraph({ user, onBack }) {
                ))}
              </div>
            )}
+
+           <PrivateLinkSection
+             graphId={currentShareGraphId}
+             graphType="business"
+             userId={user.uid}
+           />
          </div>
        </div>
       )}

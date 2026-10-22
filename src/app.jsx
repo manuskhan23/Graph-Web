@@ -11,6 +11,7 @@ import Home from './pages/Home.jsx';
 import AIChat from './pages/AIChat.jsx';
 import ScientificCalculator from './pages/ScientificCalculator.jsx';
 import SharedGraphView from './pages/SharedGraphView.jsx';
+import PrivateGraphView from './pages/PrivateGraphView.jsx';
 import PrivacyPolicy from './pages/PrivacyPolicy.jsx';
 import TermsAndConditions from './pages/TermsAndConditions.jsx';
 import AboutUs from './pages/AboutUs.jsx';
@@ -208,6 +209,7 @@ function AppRoutes() {
         }
       />
       <Route path="/share" element={<SharedGraphView />} />
+      <Route path="/private/:linkCode" element={<PrivateGraphView />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
       <Route path="/terms-conditions" element={<TermsAndConditions />} />
       <Route path="/about-us" element={<AboutUs />} />

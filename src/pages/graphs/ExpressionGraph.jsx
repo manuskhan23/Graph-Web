@@ -15,6 +15,7 @@ import {
 } from "../../firebase";
 import { remove } from "firebase/database";
 import Graph from "../../components/Graph";
+import PrivateLinkSection from "../../components/PrivateLinkSection";
 
 function ExpressionGraph({ user, onBack }) {
   const [graphs, setGraphs] = useState({});
@@ -910,6 +911,12 @@ function ExpressionGraph({ user, onBack }) {
                 ))}
               </div>
             )}
+
+            <PrivateLinkSection
+              graphId={currentShareGraphId}
+              graphType="expression"
+              userId={user.uid}
+            />
           </div>
         </div>
       )}

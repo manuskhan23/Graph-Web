@@ -5,6 +5,7 @@ import Swal from 'sweetalert2';
 import { getUserGraphs, saveGraphData, updateGraphData, graphNameExists, database, shareGraph, getGraphShareCodes, revokeShareCode } from '../../firebase';
 import { ref, remove } from 'firebase/database';
 import Graph from '../../components/Graph';
+import PrivateLinkSection from '../../components/PrivateLinkSection';
 
 function EducationGraph({ user, onBack, graphName, action }) {
   const navigate = useNavigate();
@@ -593,6 +594,12 @@ function EducationGraph({ user, onBack, graphName, action }) {
                 ))}
               </div>
             )}
+
+            <PrivateLinkSection
+              graphId={currentShareGraphId}
+              graphType="education"
+              userId={user.uid}
+            />
           </div>
         </div>
       )}

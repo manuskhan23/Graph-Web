@@ -653,6 +653,117 @@ export async function updateShareVisibility(shareCode, isPublic) {
   }
 }
 
+// ✅ Private Edit Links
+// Anyone opening a private link can ONLY edit the graph data.
+// They cannot delete the graph or create new links.
+// The owner sets an open limit ('none' or a number); each open increments
+// openCount and the link auto-closes once the limit is reached.
+
+// Create a private edit link for a graph
+export async function createPrivateLink(uid, graphType, graphId, openLimit) {
+  try {
+    const linkCode = generateShareCode();
+    const linkData = {
+      linkCode,
+      ownerUid: uid,
+      graphType,
+      graphId,
+      openLimit: openLimit === 'none' ? 'none' : Number(openLimit),
+      openCount: 0,
+      revoked: false,
+      createdAt: serverTimestamp()
+    };
+    await set(ref(database, `privateLinks/${linkCode}`), linkData);
+    return linkCode;
+  } catch (error) {
+    console.error('Error creating private link:', error);
+    throw error;
+  }
+}
+
+// Resolve a private link: validates status, counts the open, returns graph
+export async function getPrivateLink(linkCode) {
+  try {
+    const snapshot = await get(ref(database, `privateLinks/${linkCode}`));
+    if (!snapshot.exists()) {
+      return { status: 'not_found' };
+    }
+
+    const link = snapshot.val();
+
+    if (link.revoked) {
+      return { status: 'revoked', link };
+    }
+    if (link.openLimit !== 'none' && (link.openCount || 0) >= Number(link.openLimit)) {
+      return { status: 'limit_reached', link };
+    }
+
+    const graph = await getGraph(link.ownerUid, link.graphType, link.graphId);
+    if (!graph) {
+      return { status: 'not_found' };
+    }
+
+    // Count this open
+    const newCount = (link.openCount || 0) + 1;
+    await set(ref(database, `privateLinks/${linkCode}/openCount`), newCount);
+
+    return { status: 'ok', link: { ...link, openCount: newCount }, graph };
+  } catch (error) {
+    console.error('Error fetching private link:', error);
+    throw error;
+  }
+}
+
+// List all private links a user created for one graph
+export async function getPrivateLinksForGraph(uid, graphType, graphId) {
+  try {
+    const snapshot = await get(ref(database, 'privateLinks'));
+    if (!snapshot.exists()) {
+      return [];
+    }
+    const all = snapshot.val();
+    return Object.values(all)
+      .filter(l => l.ownerUid === uid && l.graphType === graphType && l.graphId === graphId)
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  } catch (error) {
+    console.error('Error fetching private links:', error);
+    throw error;
+  }
+}
+
+// Owner revokes a private link (record stays so visitors see the revoked message)
+export async function revokePrivateLink(linkCode) {
+  try {
+    await set(ref(database, `privateLinks/${linkCode}/revoked`), true);
+  } catch (error) {
+    console.error('Error revoking private link:', error);
+    throw error;
+  }
+}
+
+// Private-link visitors save ONLY the graph data (labels/values),
+// preserving name, type, createdAt and everything else untouched.
+export async function updateGraphDataOnly(ownerUid, graphType, graphId, { labels, data, datasets }) {
+  try {
+    const existing = await getGraph(ownerUid, graphType, graphId);
+    if (!existing) {
+      throw new Error('Graph not found');
+    }
+    const cleanGraphData = {
+      ...existing,
+      labels,
+      data,
+      datasets: datasets || data,
+      updatedAt: serverTimestamp()
+    };
+    await set(ref(database, `graphs/${ownerUid}/${graphType}/${graphId}`), cleanGraphData);
+    return graphId;
+  } catch (error) {
+    console.error('Error updating graph data via private link:', error);
+    throw error;
+  }
+}
+
 // Save contact message
 export async function saveContactMessage(name, email, subject, message) {
   try {

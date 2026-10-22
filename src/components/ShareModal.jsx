@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import { shareGraph, getGraphShareCodes, revokeShareCode } from '../firebase';
+import PrivateLinkSection from './PrivateLinkSection';
 
 function ShareModal({ 
   isOpen, 
@@ -162,6 +163,8 @@ function ShareModal({
             ))}
           </div>
         )}
+
+        <PrivateLinkSection graphId={graphId} graphType={graphType} userId={userId} />
       </div>
     </div>
   );

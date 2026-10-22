@@ -1,0 +1,29 @@
+# MyGraph - robots.txt
+# https://graph-website.vercel.app
+
+User-agent: *
+
+# --- Allow public pages ---
+Allow: /$
+Allow: /login
+Allow: /signup
+Allow: /privacy-policy
+Allow: /terms-conditions
+Allow: /about-us
+Allow: /contact-us
+Allow: /share
+Allow: /assets/
+
+# --- Block private & user-specific areas ---
+# Private edit links must never be indexed (owner-intended secret URLs)
+Disallow: /private/
+# Personal user dashboards and workspace routes
+Disallow: /user/
+# Shared graph view opened via ?share= query (duplicate, non-canonical views)
+Disallow: /*?share=
+
+# No crawl-delay needed; be nice anyway
+Crawl-delay: 1
+
+# Host directive for Yandex-style bots
+Host: graph-website.vercel.app

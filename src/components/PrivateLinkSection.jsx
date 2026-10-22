@@ -103,7 +103,7 @@ function PrivateLinkSection({ graphId, graphType, userId }) {
   return (
     <div className="private-link-section">
       <h3>🔐 Private Edit Links</h3>
-      <p className="share-desc">Anyone with a private link can <strong>edit the graph data only</strong> — no deleting, no new links.</p>
+      <p className="share-desc">Anyone with a private link can <strong>edit the graph data only</strong> — no deleting, no new links. Links with a limit allow <strong>one open per device every 30 minutes</strong> so one person can't drain the limit.</p>
 
       <div className="private-limit-picker">
         <label className="picker-label">Open limit:</label>

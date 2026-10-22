@@ -682,8 +682,29 @@ export async function createPrivateLink(uid, graphType, graphId, openLimit) {
   }
 }
 
-// Resolve a private link: validates status, counts the open, returns graph
-export async function getPrivateLink(linkCode) {
+// Resolve a private link: validates status, enforces the per-device cooldown
+// for limited links (one open per IP every 30 minutes, so a single visitor
+// cannot drain the limit by refreshing), counts the open and returns the graph.
+export const PRIVATE_LINK_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
+
+// Best-effort public IP lookup (used only as an anti-abuse hint, never for
+// identity). Falls back to null when the lookup service is unreachable.
+export async function getVisitorIp() {
+  try {
+    const res = await fetch('https://api.ipify.org?format=json');
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.ip || null;
+  } catch (error) {
+    console.warn('IP lookup failed, falling back to localStorage guard:', error);
+    return null;
+  }
+}
+
+// Firebase keys cannot contain . : $ # [ ] / — flatten the IP into a safe key
+const ipToKey = (ip) => String(ip).replace(/[^a-zA-Z0-9]/g, '_');
+
+export async function getPrivateLink(linkCode, visitorIp = null) {
   try {
     const snapshot = await get(ref(database, `privateLinks/${linkCode}`));
     if (!snapshot.exists()) {
@@ -695,8 +716,22 @@ export async function getPrivateLink(linkCode) {
     if (link.revoked) {
       return { status: 'revoked', link };
     }
-    if (link.openLimit !== 'none' && (link.openCount || 0) >= Number(link.openLimit)) {
-      return { status: 'limit_reached', link };
+
+    const isLimited = link.openLimit !== 'none';
+    const ipKey = isLimited && visitorIp ? ipToKey(visitorIp) : null;
+
+    if (isLimited) {
+      // Same device (IP) must wait 30 minutes between opens
+      const lastOpen = ipKey && link.visitors ? Number(link.visitors[ipKey]) : null;
+      if (lastOpen) {
+        const elapsed = Date.now() - lastOpen;
+        if (elapsed < PRIVATE_LINK_COOLDOWN_MS) {
+          return { status: 'cooldown', remainingMs: PRIVATE_LINK_COOLDOWN_MS - elapsed, link };
+        }
+      }
+      if ((link.openCount || 0) >= Number(link.openLimit)) {
+        return { status: 'limit_reached', link };
+      }
     }
 
     const graph = await getGraph(link.ownerUid, link.graphType, link.graphId);
@@ -707,6 +742,9 @@ export async function getPrivateLink(linkCode) {
     // Count this open
     const newCount = (link.openCount || 0) + 1;
     await set(ref(database, `privateLinks/${linkCode}/openCount`), newCount);
+    if (ipKey) {
+      await set(ref(database, `privateLinks/${linkCode}/visitors/${ipKey}`), Date.now());
+    }
 
     return { status: 'ok', link: { ...link, openCount: newCount }, graph };
   } catch (error) {

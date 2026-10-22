@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { getPrivateLink, updateGraphDataOnly } from '../firebase';
+import { getPrivateLink, updateGraphDataOnly, getVisitorIp, PRIVATE_LINK_COOLDOWN_MS } from '../firebase';
 import Graph from '../components/Graph';
 import '../styles/shared-graph.css';
 
@@ -22,8 +22,9 @@ function normalise(graph) {
 
 function PrivateGraphView() {
   const { linkCode } = useParams();
-  const [state, setState] = useState('loading'); // loading | closed | ready
+  const [state, setState] = useState('loading'); // loading | cooldown | closed | ready
   const [closedInfo, setClosedInfo] = useState(null); // { title, message }
+  const [remainingMs, setRemainingMs] = useState(0);
   const [link, setLink] = useState(null);
   const [graph, setGraph] = useState(null);
 
@@ -34,44 +35,87 @@ function PrivateGraphView() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await getPrivateLink(linkCode);
-        if (cancelled) return;
+  const storageKey = `privateLink:${linkCode}`;
 
-        if (res.status === 'ok') {
-          setLink(res.link);
-          setGraph(res.graph);
-          setState('ready');
-        } else if (res.status === 'revoked') {
-          setClosedInfo({
-            title: 'This private link has been revoked or does not exist',
-            message: 'The graph owner has revoked this private link, so it can no longer be opened.'
-          });
-          setState('closed');
-        } else if (res.status === 'limit_reached') {
-          setClosedInfo({
-            title: 'Open limit reached',
-            message: 'This private link has reached its maximum number of opens and has automatically closed.'
-          });
-          setState('closed');
-        } else {
-          setClosedInfo({
-            title: 'This private link has been revoked or does not exist',
-            message: 'The key is invalid — it was revoked by the owner or never existed.'
-          });
-          setState('closed');
+  const readLocal = () => {
+    try { return JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { return null; }
+  };
+  const writeLocal = (openLimit, lastOpen) => {
+    try { localStorage.setItem(storageKey, JSON.stringify({ openLimit: String(openLimit), lastOpen })); } catch { /* ignore */ }
+  };
+
+  const attemptOpen = useCallback(async () => {
+    setState('loading');
+
+    // 1) Same-browser guard: a limited link can only be opened once per 30 min
+    const stored = readLocal();
+    if (stored && stored.openLimit !== 'none') {
+      const elapsed = Date.now() - stored.lastOpen;
+      if (elapsed < PRIVATE_LINK_COOLDOWN_MS) {
+        setRemainingMs(PRIVATE_LINK_COOLDOWN_MS - elapsed);
+        setState('cooldown');
+        return;
+      }
+    }
+
+    try {
+      // 2) Same-device guard across browsers: recognised by public IP
+      const ip = await getVisitorIp();
+      const res = await getPrivateLink(linkCode, ip);
+
+      if (res.status === 'ok') {
+        setLink(res.link);
+        setGraph(res.graph);
+        if (res.link.openLimit !== 'none') {
+          writeLocal(res.link.openLimit, Date.now());
         }
-      } catch (err) {
-        if (cancelled) return;
-        setClosedInfo({ title: 'Something went wrong', message: String(err.message || err) });
+        setState('ready');
+      } else if (res.status === 'cooldown') {
+        // Align local storage with the server's record of this device's last open
+        if (res.link) writeLocal(res.link.openLimit, Date.now() - res.remainingMs);
+        setRemainingMs(res.remainingMs);
+        setState('cooldown');
+      } else if (res.status === 'limit_reached') {
+        setClosedInfo({
+          title: 'Open limit reached',
+          message: 'This private link has reached its maximum number of opens and has automatically closed.'
+        });
+        setState('closed');
+      } else {
+        // revoked (legacy) or not_found — deleted keys land here too
+        setClosedInfo({
+          title: 'This private link has been revoked or does not exist',
+          message: 'The key is invalid — it was revoked by the owner or never existed.'
+        });
         setState('closed');
       }
-    })();
-    return () => { cancelled = true; };
+    } catch (err) {
+      setClosedInfo({ title: 'Something went wrong', message: String(err.message || err) });
+      setState('closed');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkCode]);
+
+  useEffect(() => {
+    attemptOpen();
+  }, [attemptOpen]);
+
+  // Live countdown on the cooldown screen; auto-retry when it hits zero
+  useEffect(() => {
+    if (state !== 'cooldown') return undefined;
+    const timer = setInterval(() => {
+      setRemainingMs(prev => {
+        const next = prev - 1000;
+        if (next <= 0) {
+          clearInterval(timer);
+          attemptOpen();
+          return 0;
+        }
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [state, attemptOpen]);
 
   const startEdit = () => {
     const { labels, datasets } = normalise(graph);
@@ -150,6 +194,27 @@ function PrivateGraphView() {
     );
   }
 
+  if (state === 'cooldown') {
+    const mins = Math.floor(remainingMs / 60000);
+    const secs = Math.floor((remainingMs % 60000) / 1000);
+    return (
+      <div className="shared-graph-container">
+        <div className="error-message">
+          <h2>⏳ Cooldown active</h2>
+          <p>
+            You already used an open on this private link from this device. Limited links
+            allow <strong>one open per device every 30 minutes</strong> so every visitor
+            gets a fair share.
+          </p>
+          <p className="private-link-meter">
+            Next open available in {mins}:{String(secs).padStart(2, '0')}
+          </p>
+          <a href="/">Return to Home</a>
+        </div>
+      </div>
+    );
+  }
+
   if (state === 'closed') {
     return (
       <div className="shared-graph-container">
@@ -175,7 +240,10 @@ function PrivateGraphView() {
           Type: {String(graph.type || '').toUpperCase()}
         </p>
         <p className="read-only-badge">✏️ Edit access • You can change this graph's data only</p>
-        <p className="private-link-meter">{limitLabel}</p>
+        <p className="private-link-meter">
+          {limitLabel}
+          {link.openLimit !== 'none' ? ' • one open per device every 30 min' : ''}
+        </p>
       </div>
 
       <div className="shared-graph-display">

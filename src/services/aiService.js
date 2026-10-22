@@ -1,5 +1,5 @@
 // Use environment variable or default to localhost
-const LOCAL_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const LOCAL_API_URL = import.meta.env.VITE_API_URL || 'https://graph-web-mn53.vercel.app/api';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'openai/gpt-oss-120b';
 

@@ -9,8 +9,8 @@ import '../styles/aichat.css';
 
 function AIChat({ user, onBack }) {
   const navigate = useNavigate();
-  const { username, adminname, chatName } = useParams();
-  const baseUrl = username ? `/user/${username}` : `/admin/${adminname}`;
+  const { username, chatName } = useParams();
+  const baseUrl = `/user/${username}`;
   // Chat list and management
   const [chats, setChats] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);

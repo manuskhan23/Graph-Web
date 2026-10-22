@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { onAuthStateReady, isUserAdmin, getUserData, ensureUsername } from './firebase';
+import { onAuthStateReady, ensureUsername } from './firebase';
 import './styles/main.css';
 
 // Pages
@@ -16,10 +16,6 @@ import PrivacyPolicy from './pages/PrivacyPolicy.jsx';
 import TermsAndConditions from './pages/TermsAndConditions.jsx';
 import AboutUs from './pages/AboutUs.jsx';
 import ContactUs from './pages/ContactUs.jsx';
-import SurveyForm from '../survey/form.jsx';
-import SurveyGraph from '../survey/graph.jsx';
-import AdminDashboard from '../survey/admin.jsx';
-import AdminManager from '../survey/adminManager.jsx';
 import GraphRouter from './components/GraphRouter.jsx';
 import Navbar from './components/Navbar.jsx';
 import Footer from './components/Footer.jsx';
@@ -63,9 +59,9 @@ const LoadingScreen = () => (
 );
 
 // Layout Wrapper
-const UserLayout = ({ children, user, onLogout, isAdmin }) => (
+const UserLayout = ({ children, user, onLogout }) => (
   <div className="app">
-    {user && <Navbar onLogout={onLogout} isAdmin={isAdmin} />}
+    {user && <Navbar onLogout={onLogout} />}
     <main className="main-content">{children}</main>
     {user && <Footer />}
   </div>
@@ -85,7 +81,7 @@ const ProtectedRoute = ({ children, user, loading }) => {
 };
 
 // Root Route Handler - Check for share links
-const RootRouteHandler = ({ user, userUsername, isAdmin, surveyCompleted, onSurveyComplete, loading }) => {
+const RootRouteHandler = ({ user, userUsername, loading }) => {
   const [searchParams] = useSearchParams();
   const shareCode = searchParams.get("share");
 
@@ -95,17 +91,11 @@ const RootRouteHandler = ({ user, userUsername, isAdmin, surveyCompleted, onSurv
   }
 
   // Otherwise, handle normal routing
-  if (!surveyCompleted) {
-    return <SurveyForm onComplete={onSurveyComplete} />;
-  }
   if (!user) {
     return <Navigate to="/login" replace />;
   }
   if (!userUsername) {
     return <LoadingScreen />;
-  }
-  if (isAdmin) {
-    return <Navigate to={`/admin/${userUsername}`} replace />;
   }
   return <Navigate to={`/user/${userUsername}`} replace />;
 };
@@ -113,22 +103,13 @@ const RootRouteHandler = ({ user, userUsername, isAdmin, surveyCompleted, onSurv
 function AppRoutes() {
   const [user, setUser] = useState(null);
   const [userUsername, setUserUsername] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [surveyCompleted, setSurveyCompleted] = useState(() => {
-    return localStorage.getItem('surveyCompleted') === 'true';
-  });
 
   useEffect(() => {
     const unsubscribe = onAuthStateReady(async (authUser) => {
       setUser(authUser);
-      
-      // Check if user is admin
+
       if (authUser) {
-        const mainAdminEmail = 'anus2580@gmail.com';
-        const adminStatus = authUser.email && authUser.email.toLowerCase() === mainAdminEmail.toLowerCase();
-        setIsAdmin(adminStatus);
-        
         // Fetch or create username from database
         try {
           const username = await ensureUsername(authUser.uid);
@@ -138,10 +119,9 @@ function AppRoutes() {
           setUserUsername(authUser.displayName || authUser.uid);
         }
       } else {
-        setIsAdmin(false);
         setUserUsername(null);
       }
-      
+
       setLoading(false);
     });
     return unsubscribe;
@@ -150,11 +130,6 @@ function AppRoutes() {
   const handleLogout = () => {
     setUser(null);
     window.location.href = '/login';
-  };
-
-  const handleSurveyComplete = () => {
-    localStorage.setItem('surveyCompleted', 'true');
-    setSurveyCompleted(true);
   };
 
   if (loading) {
@@ -166,7 +141,7 @@ function AppRoutes() {
       {/* Root Route - Handle share links */}
       <Route 
         path="/" 
-        element={<RootRouteHandler user={user} userUsername={userUsername} isAdmin={isAdmin} surveyCompleted={surveyCompleted} onSurveyComplete={handleSurveyComplete} loading={loading} />}
+        element={<RootRouteHandler user={user} userUsername={userUsername} loading={loading} />}
       />
 
       {/* Public Routes */}
@@ -174,11 +149,7 @@ function AppRoutes() {
         path="/login"
         element={
           user && userUsername ? (
-            isAdmin ? (
-              <Navigate to={`/admin/${userUsername}`} replace />
-            ) : (
-              <Navigate to={`/user/${userUsername}`} replace />
-            )
+            <Navigate to={`/user/${userUsername}`} replace />
           ) : (
             <Login
               onSignupClick={() => (window.location.href = '/signup')}
@@ -193,11 +164,7 @@ function AppRoutes() {
         path="/signup"
         element={
           user && userUsername ? (
-            isAdmin ? (
-              <Navigate to={`/admin/${userUsername}`} replace />
-            ) : (
-              <Navigate to={`/user/${userUsername}`} replace />
-            )
+            <Navigate to={`/user/${userUsername}`} replace />
           ) : (
             <Signup
               onLoginClick={() => (window.location.href = '/login')}
@@ -222,8 +189,8 @@ function AppRoutes() {
           index
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <Home user={user} isAdmin={false} />
+              <UserLayout user={user} onLogout={handleLogout}>
+                <Home user={user} />
               </UserLayout>
             </ProtectedRoute>
           }
@@ -234,7 +201,7 @@ function AppRoutes() {
           path=":graphType/*"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
+              <UserLayout user={user} onLogout={handleLogout}>
                 <GraphRouter user={user} onBack={() => window.history.back()} />
               </UserLayout>
             </ProtectedRoute>
@@ -246,7 +213,7 @@ function AppRoutes() {
           path="news/privacy-policy"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
+              <UserLayout user={user} onLogout={handleLogout}>
                 <PrivacyPolicy />
               </UserLayout>
             </ProtectedRoute>
@@ -256,7 +223,7 @@ function AppRoutes() {
           path="news/terms-conditions"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
+              <UserLayout user={user} onLogout={handleLogout}>
                 <TermsAndConditions />
               </UserLayout>
             </ProtectedRoute>
@@ -266,7 +233,7 @@ function AppRoutes() {
           path="news/about-us"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
+              <UserLayout user={user} onLogout={handleLogout}>
                 <AboutUs />
               </UserLayout>
             </ProtectedRoute>
@@ -278,7 +245,7 @@ function AppRoutes() {
           path="ai-assistant/:chatName"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
+              <UserLayout user={user} onLogout={handleLogout}>
                 <AIChat user={user} />
               </UserLayout>
             </ProtectedRoute>
@@ -290,7 +257,7 @@ function AppRoutes() {
           path="contact"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
+              <UserLayout user={user} onLogout={handleLogout}>
                 <ContactUs />
               </UserLayout>
             </ProtectedRoute>
@@ -302,215 +269,13 @@ function AppRoutes() {
           path="calculator"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
+              <UserLayout user={user} onLogout={handleLogout}>
                 <ScientificCalculator />
               </UserLayout>
             </ProtectedRoute>
           }
         />
 
-        {/* Survey Form */}
-        <Route
-          path="survey-form"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <SurveyForm user={user} />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Survey Graph */}
-        <Route
-          path="survey-graph"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <SurveyGraph user={user} />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
-      </Route>
-
-      {/* ============ ADMIN ROUTES: /admin/:adminname/* ============ */}
-      <Route path="/admin/:adminname">
-         {/* Home */}
-        <Route
-          index
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <Home user={user} isAdmin={true} />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Graph Routes */}
-        <Route
-          path=":graphType/*"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <GraphRouter user={user} onBack={() => window.history.back()} />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* News/Legal Routes */}
-        <Route
-          path="news/privacy-policy"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <PrivacyPolicy />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="news/terms-conditions"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <TermsAndConditions />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="news/about-us"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <AboutUs />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* AI Assistant Routes */}
-        <Route
-          path="ai-assistant/:chatName"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <AIChat user={user} />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Contact */}
-        <Route
-          path="contact"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <ContactUs />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Calculator */}
-        <Route
-          path="calculator"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <ScientificCalculator />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Survey Form */}
-        <Route
-          path="survey-form"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <SurveyForm user={user} />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Survey Graph */}
-        <Route
-          path="survey-graph"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <SurveyGraph user={user} />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Admin Dashboard */}
-        <Route
-          path="admin-dashboard"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <AdminDashboard user={user} />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Admin Dashboard - Unique Students */}
-        <Route
-          path="admin-dashboard/unique-students"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <AdminDashboard user={user} tab="unique-students" />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Admin Dashboard - Responses */}
-        <Route
-          path="admin-dashboard/responses"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <AdminDashboard user={user} tab="responses" />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Admin Dashboard - Manage Admins */}
-        <Route
-          path="admin-dashboard/manage-admins"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <AdminDashboard user={user} tab="manage-admins" />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Manage Admins */}
-        <Route
-          path="manage-admins"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <UserLayout user={user} onLogout={handleLogout} isAdmin={isAdmin}>
-                <AdminManager user={user} />
-              </UserLayout>
-            </ProtectedRoute>
-          }
-        />
       </Route>
 
       {/* Fallback */}

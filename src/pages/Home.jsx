@@ -3,10 +3,10 @@ import { motion } from 'framer-motion';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getUserData } from '../firebase';
 
-function Home({ onSelectCategory, isAdmin }) {
+function Home({ onSelectCategory }) {
   const navigate = useNavigate();
-  const { username, adminname } = useParams();
-  const baseUrl = adminname ? `/admin/${adminname}` : `/user/${username}`;
+  const { username } = useParams();
+  const baseUrl = `/user/${username}`;
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
 

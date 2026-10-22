@@ -9,8 +9,8 @@ import PrivateLinkSection from '../../components/PrivateLinkSection';
 
 function EducationGraph({ user, onBack, graphName, action }) {
   const navigate = useNavigate();
-  const { username, adminname } = useParams();
-  const baseUrl = adminname ? `/admin/${adminname}` : `/user/${username}`;
+  const { username } = useParams();
+  const baseUrl = `/user/${username}`;
   
   const [graphs, setGraphs] = useState({});
   const [loading, setLoading] = useState(true);

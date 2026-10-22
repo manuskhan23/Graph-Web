@@ -4,22 +4,17 @@ import { motion } from 'framer-motion';
 import { logout, getCurrentUser } from '../firebase';
 import logo from '../logo.png';
 
-function Navbar({ onLogout, isAdmin: userIsAdmin }) {
+function Navbar({ onLogout }) {
   const navigate = useNavigate();
-  const { username, adminname } = useParams();
-  
-  // Determine baseUrl based on route and admin status
+  const { username } = useParams();
+
+  // Determine baseUrl from the current route
   let baseUrl;
-  if (adminname) {
-    baseUrl = `/admin/${adminname}`;
-  } else if (username) {
-    // If in /user route but user is admin, should navigate to /admin instead
-    baseUrl = userIsAdmin ? `/admin/${username}` : `/user/${username}`;
+  if (username) {
+    baseUrl = `/user/${username}`;
   } else {
     baseUrl = `/`;
   }
-  
-  // Admin status is passed via props, no need to check here
 
   const handleLogout = async () => {
     try {
@@ -35,13 +30,6 @@ function Navbar({ onLogout, isAdmin: userIsAdmin }) {
     { label: 'Home', path: baseUrl },
     { label: 'AI Assistant', path: `${baseUrl}/ai-assistant/default` },
     { label: 'Calculator', path: `${baseUrl}/calculator` },
-    { label: 'Survey Form', path: `${baseUrl}/survey-form` },
-  ];
-
-  const adminItems = [
-    { label: 'Survey Graph', path: `${baseUrl}/survey-graph` },
-    { label: 'Admin Dashboard', path: `${baseUrl}/admin-dashboard` },
-    { label: 'Manage Admins', path: `${baseUrl}/manage-admins` },
   ];
 
   return (
@@ -88,23 +76,6 @@ function Navbar({ onLogout, isAdmin: userIsAdmin }) {
                  {item.label}
                </motion.button>
              ))}
-             {userIsAdmin && (
-               <>
-                 {adminItems.map((item) => (
-                   <motion.button
-                     key={item.label}
-                     className="nav-link"
-                     onClick={() => navigate(item.path)}
-                     whileHover={{ scale: 1.05 }}
-                     whileTap={{ scale: 0.95 }}
-                     initial={{ opacity: 0, y: -10 }}
-                     animate={{ opacity: 1, y: 0 }}
-                   >
-                     {item.label}
-                   </motion.button>
-                 ))}
-               </>
-             )}
             <motion.button 
               onClick={handleLogout} 
               className="btn btn-danger btn-sm ms-2"

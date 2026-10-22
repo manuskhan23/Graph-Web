@@ -73,27 +73,17 @@ export async function signup(email, password, name) {
     // Set displayName in Firebase Auth
     await updateProfile(cred.user, { displayName: username });
     
-    // Check if user is main admin
-    const mainAdminEmail = 'anus2580@gmail.com';
-    const isAdmin = email.toLowerCase() === mainAdminEmail.toLowerCase();
-    
     // Save to database
     await set(ref(database, `users/${uid}`), {
       uid: uid,
       email: email,
       name: name,
       username: username,
-      isAdmin: isAdmin,
       createdAt: serverTimestamp()
     });
     
     // Reserve username in global index
     await set(ref(database, `usernames/${username}`), uid);
-    
-    // Store admin status in Firebase Auth custom claims if available
-    if (isAdmin) {
-      cred.user.isAdmin = true;
-    }
     
     return uid;
   } catch (error) {
@@ -165,17 +155,6 @@ export async function getUserData(uid) {
   } catch (error) {
     console.error('Error fetching user data:', error);
     throw error;
-  }
-}
-
-// ✅ Check if user is admin
-export async function isUserAdmin(uid) {
-  try {
-    const userData = await getUserData(uid);
-    return userData && userData.isAdmin === true;
-  } catch (error) {
-    console.error('Error checking admin status:', error);
-    return false;
   }
 }
 

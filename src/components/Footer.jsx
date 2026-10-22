@@ -4,8 +4,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 function Footer() {
   const currentYear = new Date().getFullYear();
   const navigate = useNavigate();
-  const { username, adminname } = useParams();
-  const baseUrl = username ? `/user/${username}` : adminname ? `/admin/${adminname}` : '/';
+  const { username } = useParams();
+  const baseUrl = username ? `/user/${username}` : '/';
 
   return (
     <footer className="footer">
@@ -86,14 +86,6 @@ function Footer() {
                 onClick={() => navigate(`${baseUrl}/calculator`)}
               >
                 Scientific Calculator
-              </button>
-            </li>
-            <li>
-              <button 
-                className="footer-link" 
-                onClick={() => navigate(`${baseUrl}/survey-form`)}
-              >
-                Survey Form
               </button>
             </li>
           </ul>

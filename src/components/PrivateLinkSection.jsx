@@ -76,7 +76,7 @@ function PrivateLinkSection({ graphId, graphType, userId }) {
   const handleRevoke = async (linkCode) => {
     const result = await Swal.fire({
       title: 'Revoke Private Link?',
-      text: 'Visitors will see a "link revoked" message and can no longer edit.',
+      text: 'The link will be permanently deleted. It disappears from this list, and anyone opening it will see a "revoked or does not exist" message.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
@@ -86,7 +86,7 @@ function PrivateLinkSection({ graphId, graphType, userId }) {
       try {
         await revokePrivateLink(linkCode);
         await loadLinks();
-        Swal.fire({ icon: 'success', title: 'Revoked!', text: 'Private link is now closed.' });
+        Swal.fire({ icon: 'success', title: 'Revoked!', text: 'Private link deleted — it no longer works.' });
       } catch (err) {
         Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to revoke private link' });
       }
@@ -94,7 +94,6 @@ function PrivateLinkSection({ graphId, graphType, userId }) {
   };
 
   const statusOf = (link) => {
-    if (link.revoked) return { label: '⛔ REVOKED', cls: 'closed' };
     if (link.openLimit === 'none') return { label: '🟢 ACTIVE • ∞ opens', cls: 'active' };
     const used = link.openCount || 0;
     if (used >= Number(link.openLimit)) return { label: `🔴 LIMIT REACHED (${used}/${link.openLimit})`, cls: 'closed' };
@@ -171,11 +170,9 @@ function PrivateLinkSection({ graphId, graphType, userId }) {
                   >
                     Copy Link
                   </button>
-                  {!link.revoked && (
-                    <button className="revoke-btn" onClick={() => handleRevoke(link.linkCode)}>
-                      Revoke
-                    </button>
-                  )}
+                  <button className="revoke-btn" onClick={() => handleRevoke(link.linkCode)}>
+                    Revoke
+                  </button>
                 </div>
               </div>
             );

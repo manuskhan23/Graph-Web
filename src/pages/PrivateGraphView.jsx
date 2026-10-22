@@ -47,7 +47,7 @@ function PrivateGraphView() {
           setState('ready');
         } else if (res.status === 'revoked') {
           setClosedInfo({
-            title: 'This private link has been revoked',
+            title: 'This private link has been revoked or does not exist',
             message: 'The graph owner has revoked this private link, so it can no longer be opened.'
           });
           setState('closed');
@@ -59,8 +59,8 @@ function PrivateGraphView() {
           setState('closed');
         } else {
           setClosedInfo({
-            title: 'Link not found',
-            message: 'This private link is invalid or the graph it points to no longer exists.'
+            title: 'This private link has been revoked or does not exist',
+            message: 'The key is invalid — it was revoked by the owner or never existed.'
           });
           setState('closed');
         }

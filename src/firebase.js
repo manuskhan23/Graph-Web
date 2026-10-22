@@ -14,6 +14,7 @@ import {
   ref,
   set,
   get,
+  remove,
   serverTimestamp
 } from "firebase/database";
 import {
@@ -723,7 +724,7 @@ export async function getPrivateLinksForGraph(uid, graphType, graphId) {
     }
     const all = snapshot.val();
     return Object.values(all)
-      .filter(l => l.ownerUid === uid && l.graphType === graphType && l.graphId === graphId)
+      .filter(l => l.ownerUid === uid && l.graphType === graphType && l.graphId === graphId && !l.revoked)
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   } catch (error) {
     console.error('Error fetching private links:', error);
@@ -731,10 +732,11 @@ export async function getPrivateLinksForGraph(uid, graphType, graphId) {
   }
 }
 
-// Owner revokes a private link (record stays so visitors see the revoked message)
+// Owner revokes a private link: the record is deleted from the database,
+// so it disappears from the owner's UI and visitors see "revoked or does not exist".
 export async function revokePrivateLink(linkCode) {
   try {
-    await set(ref(database, `privateLinks/${linkCode}/revoked`), true);
+    await remove(ref(database, `privateLinks/${linkCode}`));
   } catch (error) {
     console.error('Error revoking private link:', error);
     throw error;

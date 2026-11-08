@@ -1,0 +1,5 @@
+
+# NEXUS runtime data
+.nexus-data/
+ui/dist/
+dist/

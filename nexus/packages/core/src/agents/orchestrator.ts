@@ -42,6 +42,8 @@ export interface OrchestrationResult {
 }
 
 export class AgentOrchestrator {
+  /** Resolves when role definitions have been persisted. */
+  readonly ready: Promise<void>;
   private leases = new Map<string, Lease>();
   private delegations: { at: number; role: AgentRole; taskId: string; files: string[]; status: string }[] = [];
 
@@ -50,13 +52,14 @@ export class AgentOrchestrator {
     private readonly events?: EventBus,
     private readonly registry?: ToolRegistry,
   ) {
-    this.seedAgents();
+    // Seeding is kicked off once; async callers may await `ready`.
+    this.ready = this.seedAgents();
   }
 
   /** Persist role definitions so the UI and analytics read from real rows. */
-  private seedAgents(): void {
+  private async seedAgents(): Promise<void> {
     for (const agent of AGENT_DESCRIPTORS) {
-      this.db.observability.upsertAgent({
+      await this.db.observability.upsertAgent({
         role: agent.role,
         name: agent.name,
         description: agent.description,
@@ -66,8 +69,9 @@ export class AgentOrchestrator {
     }
   }
 
-  agents(): AgentDescriptor[] {
-    const stored = this.db.observability.agents();
+  async agents(): Promise<AgentDescriptor[]> {
+    await this.ready;
+    const stored = await this.db.observability.agents();
     return stored.map((row) => ({
       role: row.role as AgentRole,
       name: row.name,
@@ -77,8 +81,8 @@ export class AgentOrchestrator {
     }));
   }
 
-  agentFor(role: AgentRole): AgentDescriptor {
-    const agent = this.agents().find((a) => a.role === role);
+  async agentFor(role: AgentRole): Promise<AgentDescriptor> {
+    const agent = (await this.agents()).find((a) => a.role === role);
     if (!agent) throw new NexusError('NOT_FOUND', `Unknown agent role: ${role}`);
     return agent;
   }
@@ -91,8 +95,8 @@ export class AgentOrchestrator {
    * Acquire a lease over the requested files. Returns conflicts rather than
    * silently proceeding, so the caller can queue, reassign or abort.
    */
-  delegate(request: DelegationRequest): OrchestrationResult {
-    const agent = this.agentFor(request.role);
+  async delegate(request: DelegationRequest): Promise<OrchestrationResult> {
+    const agent = await this.agentFor(request.role);
     const conflicts = this.findConflicts(request.files, request.taskId);
 
     if (conflicts.length > 0) {
@@ -161,10 +165,13 @@ export class AgentOrchestrator {
   }
 
   /** Aggregate per-role results into one report for the user. */
-  aggregate(results: { role: AgentRole; summary: string; ok: boolean }[]): string {
+  async aggregate(results: { role: AgentRole; summary: string; ok: boolean }[]): Promise<string> {
     if (results.length === 0) return 'No agent produced a result.';
-    return results
-      .map((r) => `${r.ok ? '✔' : '✖'} **${this.agentFor(r.role).name}** — ${r.summary}`)
-      .join('\n');
+    const lines: string[] = [];
+    for (const result of results) {
+      const agent = await this.agentFor(result.role);
+      lines.push(`${result.ok ? '✔' : '✖'} **${agent.name}** — ${result.summary}`);
+    }
+    return lines.join('\n');
   }
 }

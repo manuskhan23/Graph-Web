@@ -9,8 +9,8 @@ import { SearchEngine } from '../src/search/engine.js';
 import { walkProject } from '../src/project/scanner.js';
 import { IgnoreMatcher, parseGitignore } from '../src/project/ignore.js';
 
-test('scanner honours built-in ignore rules and skips secrets/binaries', () => {
-  const project = makeProject({
+test('scanner honours built-in ignore rules and skips secrets/binaries', async () => {
+  const project = await makeProject({
     'src/app.ts': 'export const a = 1;',
     'node_modules/pkg/index.js': 'module.exports = 1;',
     '.env': 'SECRET=1',
@@ -31,7 +31,7 @@ test('scanner honours built-in ignore rules and skips secrets/binaries', () => {
   project.cleanup();
 });
 
-test('ignore matcher handles ** globs and directory rules', () => {
+test('ignore matcher handles ** globs and directory rules', async () => {
   const matcher = new IgnoreMatcher(['**/node_modules/**', '**/*.min.js', 'coverage/', '**/tmp']);
   assert.ok(matcher.ignores('node_modules/react/index.js'));
   assert.ok(matcher.ignores('packages/a/node_modules/x.js'));
@@ -42,13 +42,13 @@ test('ignore matcher handles ** globs and directory rules', () => {
   assert.ok(!matcher.ignores('src/tmpfile.ts'));
 });
 
-test('parseGitignore converts patterns to globs', () => {
+test('parseGitignore converts patterns to globs', async () => {
   const globs = parseGitignore('dist\n# comment\n*.log\n/src/gen\n!keep.txt\n');
   assert.deepEqual(globs, ['**/dist', '**/*.log', 'src/gen', '**/keep.txt']);
 });
 
 test('indexer performs incremental add/modify/remove cycles', async () => {
-  const project = makeProject({ 'src/a.ts': 'export const a = 1;\n', 'src/b.ts': 'export const b = 2;\n' });
+  const project = await makeProject({ 'src/a.ts': 'export const a = 1;\n', 'src/b.ts': 'export const b = 2;\n' });
   const indexer = new ProjectIndexer(project.db);
 
   const first = await indexer.index(project.projectId);
@@ -69,16 +69,16 @@ test('indexer performs incremental add/modify/remove cycles', async () => {
   assert.equal(third.added, 1);
   assert.equal(third.modified, 1);
   assert.equal(third.removed, 1);
-  assert.equal(project.db.projects.countFiles(project.projectId), 3);
+  assert.equal(await project.db.projects.countFiles(project.projectId), 3);
 
-  const files = project.db.projects.filesByPath(project.projectId);
+  const files = await project.db.projects.filesByPath(project.projectId);
   assert.ok(files.has('src/c.ts'));
   assert.ok(!files.has('src/b.ts'));
   project.cleanup();
 });
 
 test('analyzer extracts stack, endpoints, symbols and issues', async () => {
-  const project = makeProject({
+  const project = await makeProject({
     'src/server.ts': FIXTURE_APP,
     'src/UserSchema.ts': 'const UserSchema = new mongoose.Schema({\n  email: String,\n  name: String,\n});\n',
     'src/big.ts': Array.from({ length: 800 }, (_, i) => `export const v${i} = ${i};`).join('\n'),
@@ -90,7 +90,7 @@ test('analyzer extracts stack, endpoints, symbols and issues', async () => {
   const indexer = new ProjectIndexer(project.db);
   await indexer.index(project.projectId);
 
-  const analysis = new ProjectAnalyzer(project.db).analyze(project.projectId);
+  const analysis = await new ProjectAnalyzer(project.db).analyze(project.projectId);
   const tech = analysis.technologies.map((t) => t.name);
   assert.ok(tech.includes('Express'));
   assert.ok(tech.includes('MongoDB'));
@@ -114,11 +114,11 @@ test('analyzer extracts stack, endpoints, symbols and issues', async () => {
 });
 
 test('analyzer flags secrets exposed to the client bundle', async () => {
-  const project = makeProject({
+  const project = await makeProject({
     'src/aiService.js': "const key = import.meta.env.VITE_GROQ_API_KEY;\nfetch(url, { headers: { Authorization: key } });\n",
   });
   await new ProjectIndexer(project.db).index(project.projectId);
-  const analysis = new ProjectAnalyzer(project.db).analyze(project.projectId);
+  const analysis = await new ProjectAnalyzer(project.db).analyze(project.projectId);
   const issue = analysis.issues.find((i) => i.id === 'public-env-secret');
   assert.ok(issue, 'public env secret issue should be raised');
   assert.equal(issue!.severity, 'error');
@@ -127,7 +127,7 @@ test('analyzer flags secrets exposed to the client bundle', async () => {
 });
 
 test('search returns ranked hits with file and line references', async () => {
-  const project = makeProject({
+  const project = await makeProject({
     'src/userService.ts': [
       'export class UserService {',
       '  async findUsers() {',
@@ -152,9 +152,9 @@ test('search returns ranked hits with file and line references', async () => {
 });
 
 test('indexing a missing project fails with NOT_FOUND', async () => {
-  const project = makeProject({});
+  const project = await makeProject({});
   const indexer = new ProjectIndexer(project.db);
-  await assert.rejects(() => indexer.index('prj_missing'), /Project not found/);
+  await assert.rejects(async () => indexer.index('prj_missing'), /Project not found/);
   project.cleanup();
 });
 

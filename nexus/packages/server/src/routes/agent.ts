@@ -31,15 +31,15 @@ export function agentRoutes(app: NexusApp): Router {
     asyncRoute(async (req, res) => {
       const body = parseBody(runSchema, req.body);
 
+      const existing = body.conversationId ? await app.db.conversations.get(body.conversationId) : null;
       const conversation =
-        body.conversationId && app.db.conversations.get(body.conversationId)
-          ? app.db.conversations.get(body.conversationId)!
-          : app.db.conversations.create({
-              projectId: body.projectId ?? null,
-              title: body.message.slice(0, 60),
-            });
+        existing ??
+        (await app.db.conversations.create({
+          projectId: body.projectId ?? null,
+          title: body.message.slice(0, 60),
+        }));
 
-      app.db.conversations.addMessage({
+      await app.db.conversations.addMessage({
         conversationId: conversation.id,
         role: 'user',
         content: body.message,
@@ -48,7 +48,7 @@ export function agentRoutes(app: NexusApp): Router {
 
       if (body.background) {
         // Background mode: return a task id, stream progress over SSE.
-        const task = app.db.tasks.create({
+        const task = await app.db.tasks.create({
           projectId: body.projectId ?? null,
           conversationId: conversation.id,
           title: body.message.slice(0, 80),
@@ -65,7 +65,7 @@ export function agentRoutes(app: NexusApp): Router {
             attachments: body.attachments,
           });
           report(1, `Task ${result.status}`);
-          app.db.conversations.addMessage({
+          await app.db.conversations.addMessage({
             conversationId: conversation.id,
             role: 'assistant',
             content: result.answer,
@@ -86,7 +86,7 @@ export function agentRoutes(app: NexusApp): Router {
         attachments: body.attachments,
       });
 
-      app.db.conversations.addMessage({
+      await app.db.conversations.addMessage({
         conversationId: conversation.id,
         role: 'assistant',
         content: result.answer,
@@ -102,7 +102,7 @@ export function agentRoutes(app: NexusApp): Router {
   router.get(
     '/roles',
     asyncRoute(async (_req, res) => {
-      res.json({ agents: app.orchestrator.agents() });
+      res.json({ agents: await app.orchestrator.agents() });
     }),
   );
 
@@ -119,7 +119,7 @@ export function agentRoutes(app: NexusApp): Router {
     '/approvals',
     asyncRoute(async (req, res) => {
       const status = req.query.status as 'pending' | 'approved' | 'rejected' | 'expired' | undefined;
-      res.json({ approvals: app.approvals.list(status) });
+      res.json({ approvals: await app.approvals.list(status) });
     }),
   );
 
@@ -127,7 +127,7 @@ export function agentRoutes(app: NexusApp): Router {
     '/approvals/:approvalId',
     asyncRoute(async (req, res) => {
       const body = parseBody(approvalSchema, req.body);
-      const approval = app.approvals.resolve(requireParam(req, 'approvalId'), body.approved, body.by ?? 'user');
+      const approval = await app.approvals.resolve(requireParam(req, 'approvalId'), body.approved, body.by ?? 'user');
       res.json({ approval });
     }),
   );
@@ -150,19 +150,19 @@ export function tasksRoutes(app: NexusApp): Router {
     '/',
     asyncRoute(async (req, res) => {
       const query = parseBody(taskQuerySchema, req.query);
-      res.json({ tasks: app.db.tasks.list(query) });
+      res.json({ tasks: await app.db.tasks.list(query) });
     }),
   );
 
   router.get(
     '/:taskId',
     asyncRoute(async (req, res) => {
-      const task = app.db.tasks.get(requireParam(req, 'taskId'));
+      const task = await app.db.tasks.get(requireParam(req, 'taskId'));
       if (!task) throw new NexusError('NOT_FOUND', 'Task not found');
       res.json({
         task,
-        toolExecutions: app.db.observability.toolExecutions({ taskId: task.id, limit: 100 }),
-        approvals: app.db.observability.approvals().filter((a) => a.taskId === task.id),
+        toolExecutions: await app.db.observability.toolExecutions({ taskId: task.id, limit: 100 }),
+        approvals: (await app.db.observability.approvals()).filter((a) => a.taskId === task.id),
       });
     }),
   );
@@ -171,7 +171,7 @@ export function tasksRoutes(app: NexusApp): Router {
     '/:taskId/cancel',
     asyncRoute(async (req, res) => {
       const taskId = requireParam(req, 'taskId');
-      const task = app.db.tasks.get(taskId);
+      const task = await app.db.tasks.get(taskId);
       if (!task) throw new NexusError('NOT_FOUND', 'Task not found');
       app.runtime.cancel(taskId);
       res.json({ taskId, cancelled: true });
@@ -206,7 +206,7 @@ export function conversationsRoutes(app: NexusApp): Router {
     '/',
     asyncRoute(async (req, res) => {
       const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
-      res.json({ conversations: app.db.conversations.list(projectId ?? undefined) });
+      res.json({ conversations: await app.db.conversations.list(projectId ?? undefined) });
     }),
   );
 
@@ -217,7 +217,7 @@ export function conversationsRoutes(app: NexusApp): Router {
         z.object({ projectId: z.string().nullable().optional(), title: z.string().min(1).max(120) }),
         req.body,
       );
-      res.status(201).json({ conversation: app.db.conversations.create({ projectId: body.projectId ?? null, title: body.title }) });
+      res.status(201).json({ conversation: await app.db.conversations.create({ projectId: body.projectId ?? null, title: body.title }) });
     }),
   );
 
@@ -225,8 +225,8 @@ export function conversationsRoutes(app: NexusApp): Router {
     '/:conversationId/messages',
     asyncRoute(async (req, res) => {
       const conversationId = requireParam(req, 'conversationId');
-      if (!app.db.conversations.get(conversationId)) throw new NexusError('NOT_FOUND', 'Conversation not found');
-      res.json({ messages: app.db.conversations.messages(conversationId, 300) });
+      if (!(await app.db.conversations.get(conversationId))) throw new NexusError('NOT_FOUND', 'Conversation not found');
+      res.json({ messages: await app.db.conversations.messages(conversationId, 300) });
     }),
   );
 
@@ -234,7 +234,7 @@ export function conversationsRoutes(app: NexusApp): Router {
     '/:conversationId',
     asyncRoute(async (req, res) => {
       const conversationId = requireParam(req, 'conversationId');
-      res.json({ removed: app.db.conversations.remove(conversationId) });
+      res.json({ removed: await app.db.conversations.remove(conversationId) });
     }),
   );
 

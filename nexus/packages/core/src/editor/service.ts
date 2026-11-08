@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 import { diffLines } from 'diff';
 import { NexusError } from '../errors.js';
 import type { Database } from '../storage/db.js';
+import type { Project } from '../types.js';
 import type { SnapshotService } from '../snapshots/service.js';
 import { assertNoSecret, assertReadableFile, isBinaryPath, resolveInsideProject, resolveInsideProjectReal, toRelative } from '../security/paths.js';
 import { config } from '../config.js';
@@ -64,8 +65,8 @@ export class EditorService {
 
   /* ------------------------------------------------------------- reading */
 
-  readFile(projectId: string, relPath: string): { relPath: string; content: string; hash: string; lines: number } {
-    const project = this.requireProject(projectId);
+  async readFile(projectId: string, relPath: string): Promise<{ relPath: string; content: string; hash: string; lines: number }> {
+    const project = await this.requireProject(projectId);
     const { absPath } = assertReadableFile(project.rootPath, relPath);
     const content = readFileSync(absPath, 'utf8');
     return {
@@ -76,17 +77,17 @@ export class EditorService {
     };
   }
 
-  readRange(projectId: string, relPath: string, startLine: number, endLine: number): { content: string; hash: string } {
-    const file = this.readFile(projectId, relPath);
+  async readRange(projectId: string, relPath: string, startLine: number, endLine: number): Promise<{ content: string; hash: string }> {
+    const file = await this.readFile(projectId, relPath);
     const lines = file.content.split(/\r?\n/);
     const start = Math.max(1, Math.min(startLine, lines.length));
     const end = Math.max(start, Math.min(endLine, lines.length));
     return { content: lines.slice(start - 1, end).join('\n'), hash: file.hash };
   }
 
-  listTree(projectId: string, maxEntries = 4000) {
-    const project = this.requireProject(projectId);
-    const files = this.db.projects.files(projectId);
+  async listTree(projectId: string, maxEntries = 4000): Promise<{ root: string; files: { relPath: string; language: string; size: number; lines: number; hash: string }[]; directories: { path: string; files: number }[] }> {
+    const project = await this.requireProject(projectId);
+    const files = await this.db.projects.files(projectId);
     const dirs = new Map<string, number>();
     for (const file of files) {
       const parts = file.relPath.split('/');
@@ -110,8 +111,8 @@ export class EditorService {
 
   /* ------------------------------------------------------------- staging */
 
-  stage(projectId: string, operations: EditOperation[], label = 'Code change'): StagedEditSet {
-    const project = this.requireProject(projectId);
+  async stage(projectId: string, operations: EditOperation[], label = 'Code change'): Promise<StagedEditSet> {
+    const project = await this.requireProject(projectId);
     if (!Array.isArray(operations) || operations.length === 0) {
       throw new NexusError('VALIDATION_FAILED', 'At least one edit operation is required');
     }
@@ -229,7 +230,7 @@ export class EditorService {
     }
 
     const operationId = id('edit');
-    const snapshotId = this.snapshots.capture({
+    const snapshotId = await this.snapshots.capture({
       projectId,
       relPaths: touched,
       operationId,
@@ -260,7 +261,7 @@ export class EditorService {
 
   /* ------------------------------------------------------------- applying */
 
-  apply(operationId: string, options: { approvedBy?: string } = {}): { operationId: string; applied: string[]; snapshotId: string } {
+  async apply(operationId: string, options: { approvedBy?: string } = {}): Promise<{ operationId: string; applied: string[]; snapshotId: string }> {
     const entry = this.staged.get(operationId);
     if (!entry) throw new NexusError('NOT_FOUND', `No staged edit set: ${operationId}`);
 
@@ -281,7 +282,7 @@ export class EditorService {
         const current = this.readCurrent(entry.projectRoot, change.relPath);
         assertExpectedHash(change.relPath, current.hash, change.beforeHash);
         if (existsSync(abs)) unlinkSync(abs);
-        this.db.projects.deleteFile(entry.projectId, change.relPath);
+        await this.db.projects.deleteFile(entry.projectId, change.relPath);
         applied.push(change.relPath);
         continue;
       }
@@ -292,7 +293,7 @@ export class EditorService {
         const targetAbs = resolveInsideProject(entry.projectRoot, op.to);
         mkdirSync(dirname(targetAbs), { recursive: true });
         renameSync(abs, targetAbs);
-        this.db.projects.deleteFile(entry.projectId, change.relPath);
+        await this.db.projects.deleteFile(entry.projectId, change.relPath);
         applied.push(`${change.relPath} → ${op.to}`);
         continue;
       }
@@ -310,7 +311,7 @@ export class EditorService {
       mkdirSync(dirname(abs), { recursive: true });
       writeFileSync(abs, change.afterContent ?? '', 'utf8');
       const rel = toRelative(entry.projectRoot, abs);
-      this.db.projects.upsertFile(entry.projectId, {
+      await this.db.projects.upsertFile(entry.projectId, {
         relPath: rel,
         language: detectLang(rel),
         size: Buffer.byteLength(change.afterContent ?? ''),
@@ -321,7 +322,7 @@ export class EditorService {
     }
 
     this.staged.delete(operationId);
-    this.db.observability.addActivity({
+    await this.db.observability.addActivity({
       kind: 'tool',
       level: 'info',
       title: 'Applied code changes',
@@ -331,7 +332,7 @@ export class EditorService {
       provider: null,
       status: 'completed',
     });
-    this.db.observability.audit({
+    await this.db.observability.audit({
       actor: options.approvedBy ?? 'user',
       action: 'editor.apply',
       subject: operationId,
@@ -344,8 +345,8 @@ export class EditorService {
 
   /* -------------------------------------------------------------- helpers */
 
-  private requireProject(projectId: string) {
-    const project = this.db.projects.get(projectId);
+  private async requireProject(projectId: string): Promise<Project> {
+    const project = await this.db.projects.get(projectId);
     if (!project) throw new NexusError('NOT_FOUND', `Project not found: ${projectId}`);
     return project;
   }

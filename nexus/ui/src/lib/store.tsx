@@ -32,7 +32,11 @@ interface StoreValue {
   toasts: Toast[];
   toast: (message: string, level?: 'info' | 'error') => void;
 
-  health: { providers: string[]; database: { version: number }; browser: { driver: string; available: boolean; reason?: string } } | null;
+  health: {
+    providers: string[];
+    database: { backend?: 'sqlite' | 'mongodb'; location?: string; version: number; serverVersion?: string | null };
+    browser: { driver: string; available: boolean; reason?: string };
+  } | null;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);

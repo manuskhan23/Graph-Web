@@ -1,7 +1,8 @@
 import type { Memory, MemoryCategory } from '../../types.js';
 import { id, now, parseJson, type SqlDriver, type SqlRow } from '../driver.js';
+import type { MemoryStore } from '../contracts.js';
 
-export class MemoriesRepository {
+export class SqliteMemoryStore implements MemoryStore {
   constructor(private readonly db: SqlDriver) {}
 
   private map(row: SqlRow): Memory {
@@ -18,7 +19,7 @@ export class MemoriesRepository {
     };
   }
 
-  list(filter: { projectId?: string | null; category?: MemoryCategory; limit?: number } = {}): Memory[] {
+  async list(filter: { projectId?: string | null; category?: MemoryCategory; limit?: number } = {}): Promise<Memory[]> {
     const where: string[] = [];
     const params: (string | number)[] = [];
     if (filter.projectId !== undefined) {
@@ -38,18 +39,18 @@ export class MemoriesRepository {
     return this.db.all(sql, params).map((r) => this.map(r));
   }
 
-  get(memoryId: string): Memory | null {
+  async get(memoryId: string): Promise<Memory | null> {
     const row = this.db.get('SELECT * FROM memories WHERE id = ?', [memoryId]);
     return row ? this.map(row) : null;
   }
 
-  create(input: {
+  async create(input: {
     projectId: string | null;
     category: MemoryCategory;
     content: string;
     importance?: number;
     source?: Memory['source'];
-  }): Memory {
+  }): Promise<Memory> {
     const memoryId = id('mem');
     const ts = now();
     this.db.run(
@@ -66,14 +67,14 @@ export class MemoriesRepository {
         input.source ?? 'user',
       ],
     );
-    return this.get(memoryId)!;
+    return (await this.get(memoryId))!;
   }
 
-  update(
+  async update(
     memoryId: string,
     patch: { content?: string; category?: MemoryCategory; importance?: number },
-  ): Memory | null {
-    const current = this.get(memoryId);
+  ): Promise<Memory | null> {
+    const current = await this.get(memoryId);
     if (!current) return null;
     const revisions = [...current.revisions, { at: current.updatedAt, content: current.content }].slice(-20);
     this.db.run(
@@ -87,14 +88,14 @@ export class MemoriesRepository {
         memoryId,
       ],
     );
-    return this.get(memoryId);
+    return await this.get(memoryId);
   }
 
-  remove(memoryId: string): boolean {
+  async remove(memoryId: string): Promise<boolean> {
     return this.db.run('DELETE FROM memories WHERE id = ?', [memoryId]).changes > 0;
   }
 
-  search(term: string, projectId?: string | null): Memory[] {
+  async search(term: string, projectId?: string | null): Promise<Memory[]> {
     const like = `%${term.toLowerCase()}%`;
     const rows = this.db.all(
       `SELECT * FROM memories WHERE LOWER(content) LIKE ? ${projectId ? 'AND (project_id = ? OR project_id IS NULL)' : ''}
@@ -104,7 +105,7 @@ export class MemoriesRepository {
     return rows.map((r) => this.map(r));
   }
 
-  countByCategory(): Record<string, number> {
+  async countByCategory(): Promise<Record<string, number>> {
     const out: Record<string, number> = {};
     for (const row of this.db.all<{ category: string; c: number }>(
       'SELECT category, COUNT(*) AS c FROM memories GROUP BY category',

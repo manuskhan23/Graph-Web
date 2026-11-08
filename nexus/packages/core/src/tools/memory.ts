@@ -1,7 +1,7 @@
 /** Phase 12 — memory tools (with the secret guard applied to every write). */
 import { z } from 'zod';
 import type { ToolDefinition } from './types.js';
-import type { MemoriesRepository } from '../storage/repositories/memories.js';
+import type { MemoryStore } from '../storage/contracts.js';
 import type { MemoryCategory } from '../types.js';
 import { NexusError } from '../errors.js';
 import { assertNoSecretValue } from '../security/invariants.js';
@@ -17,7 +17,7 @@ const CATEGORIES = [
   'command',
 ] as const;
 
-export function createMemoryTools(memories: MemoriesRepository): ToolDefinition<unknown, unknown>[] {
+export function createMemoryTools(memories: MemoryStore): ToolDefinition<unknown, unknown>[] {
   const remember: ToolDefinition<{ content: string; category: MemoryCategory; importance?: number }, unknown> = {
     descriptor: {
       id: 'memory.remember',
@@ -49,7 +49,7 @@ export function createMemoryTools(memories: MemoriesRepository): ToolDefinition<
     allowedRoles: [],
     async execute(input, ctx) {
       assertNoSecretValue(input.content, 'memory.remember');
-      const memory = memories.create({
+      const memory = await memories.create({
         projectId: ctx.projectId,
         category: input.category,
         content: input.content,
@@ -94,8 +94,8 @@ export function createMemoryTools(memories: MemoriesRepository): ToolDefinition<
     allowedRoles: [],
     async execute(input, ctx) {
       const found = input.query
-        ? memories.search(input.query, ctx.projectId)
-        : memories.list({ projectId: ctx.projectId, category: input.category, limit: input.limit ?? 20 });
+        ? await memories.search(input.query, ctx.projectId)
+        : await memories.list({ projectId: ctx.projectId, category: input.category, limit: input.limit ?? 20 });
       const filtered = input.category ? found.filter((m) => m.category === input.category) : found;
       return {
         ok: true,

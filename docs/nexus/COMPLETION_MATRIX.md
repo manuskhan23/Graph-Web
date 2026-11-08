@@ -141,7 +141,7 @@ NEXUS_SEED_DEMO=1 npm start                   # http://localhost:4400  (UI + RES
 
 | Feature | Status | Evidence / gap |
 | --- | --- | --- |
-| Persistent memory across conversations and restarts | Fully | SQLite-backed; live write + read. The agent's context assembler injects preferences, standards and decisions into every run, which is what makes "remembers previous chats" true rather than claimed. |
+| Persistent memory across conversations and restarts | Fully | Store-backed (SQLite verified; MongoDB unverified — see §15); live write + read. The agent's context assembler injects preferences, standards and decisions into every run, which is what makes "remembers previous chats" true rather than claimed. |
 | Categories, importance, revisions | Fully | Full revision history per memory; edits versioned. |
 | Secret rejection on write and filter on export | Fully | Live probe with a fake key → `400 SENSITIVE_DATA_BLOCKED`. |
 | Export (redacted) / import (skipping secrets) | Fully | `imported`/`skipped` counts returned. |
@@ -212,3 +212,14 @@ NEXUS_SEED_DEMO=1 npm start                   # http://localhost:4400  (UI + RES
 | Blocked (environment or credentials) | 8 |
 
 **Nothing in this matrix is listed as working because it compiled.** Each "Fully" row corresponds to a passing test or a live request captured in this session. The eight blocked rows are blocked for two reasons only: this sandbox ships no Chromium and no Electron display, and no `GEMINI_API_KEY`/`GROQ_API_KEY` was provided. All three are environmental, not architectural — the code paths behind them are typechecked and covered by `StubDriver`/`MockProvider` tests.
+
+## 15. Storage backend
+
+| Feature | Status | Evidence / gap |
+| --- | --- | --- |
+| SQLite backend (default) | Fully | `node:sqlite` + WAL, schema v2, 23 tables; 82/82 unit tests and 54/54 HTTP checks run against it. |
+| MongoDB backend | **Blocked (environment)** | Full implementation: 8 stores, 85/85 contract methods, idempotent index creation, explicit cascades, schema v2 marker, redacted URI. **No `mongod` or Docker exists in this sandbox**, so no query has been executed against a real server. Reviewable code, not a verified capability. |
+| Backend selection via `MONGODB_URI` | Fully | `config.mongodbUri`; unreachable URI raises one actionable `STORAGE_ERROR` at startup and never silently falls back to SQLite. |
+| Backend reported honestly | Fully | `GET /api/health` → `database: { backend, location, version, serverVersion }`; the UI header shows the live backend name next to the schema version. |
+| Identical ids across backends | Fully | `_id` is the application id string (`prj_…`), so a project id from one backend is valid in the other. |
+| Async store interfaces | Fully | All 8 stores return promises; 152 call sites migrated; no sync-blocking bridge anywhere. |

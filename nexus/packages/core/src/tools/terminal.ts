@@ -44,7 +44,7 @@ export function createTerminalTools(terminal: TerminalManager): ToolDefinition<u
     allowedRoles: ['coding', 'debugging', 'testing', 'documentation'],
     /** Risk is decided per command so trivial reads stay frictionless. */
     async preflight(input, ctx) {
-      const checked = terminal.validate({ projectId: ctx.projectId ?? '', command: input.command, cwd: input.cwd });
+      const checked = await terminal.validate({ projectId: ctx.projectId ?? '', command: input.command, cwd: input.cwd });
       if (checked.needsApproval) return { reason: checked.reason, risk: 'high' };
       if (/^\s*(cat|ls|pwd|git (status|diff|log)|node --version|npm --version)\b/.test(input.command)) return null;
       return checked.risk === 'medium' ? { reason: 'Installs or modifies project dependencies', risk: 'medium' } : null;
@@ -108,7 +108,7 @@ export function createTerminalTools(terminal: TerminalManager): ToolDefinition<u
     allowedRoles: ['coding', 'debugging', 'testing'],
     async execute(input, ctx) {
       if (!ctx.projectId) throw new NexusError('VALIDATION_FAILED', 'A project is required');
-      const result = terminal.start({
+      const result = await terminal.start({
         projectId: ctx.projectId,
         command: input.command,
         cwd: input.cwd,
@@ -147,8 +147,8 @@ export function createTerminalTools(terminal: TerminalManager): ToolDefinition<u
     outputSchema: z.object({ stdout: z.string(), stderr: z.string(), status: z.string(), exitCode: z.number().nullable() }),
     allowedRoles: [],
     async execute(input) {
-      const info = terminal.get(input.processId);
-      const output = terminal.output(input.processId, input.tail ?? 8000);
+      const info = await terminal.get(input.processId);
+      const output = await terminal.output(input.processId, input.tail ?? 8000);
       return {
         ok: true,
         summary: `Process ${input.processId}: ${info.status}`,
@@ -175,7 +175,7 @@ export function createTerminalTools(terminal: TerminalManager): ToolDefinition<u
     outputSchema: z.object({ status: z.string(), processId: z.string() }),
     allowedRoles: ['coding', 'debugging', 'testing'],
     async execute(input) {
-      const stopped = terminal.stop(input.processId);
+      const stopped = await terminal.stop(input.processId);
       return {
         ok: true,
         summary: `Stopped process ${input.processId}`,
@@ -202,7 +202,7 @@ export function createTerminalTools(terminal: TerminalManager): ToolDefinition<u
     outputSchema: z.object({ processes: z.array(z.unknown()) }),
     allowedRoles: [],
     async execute(input, ctx) {
-      const processes = terminal.list(input.projectId ?? ctx.projectId ?? undefined);
+      const processes = await terminal.list(input.projectId ?? ctx.projectId ?? undefined);
       return {
         ok: true,
         summary: `${processes.length} managed process(es)`,

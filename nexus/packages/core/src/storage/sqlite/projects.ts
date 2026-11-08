@@ -1,15 +1,9 @@
 import type { Project, ProjectFileRecord, ScanResult } from '../../types.js';
 import { id, now, parseJson, type SqlDriver, type SqlRow } from '../driver.js';
+import type { ChunkInput, ChunkRecord, IndexRunRecord, IndexedFileInput, ProjectStore } from '../contracts.js';
+export type { IndexedFileInput };
 
-export interface IndexedFileInput {
-  relPath: string;
-  language: string;
-  size: number;
-  hash: string;
-  lines: number;
-}
-
-export class ProjectsRepository {
+export class SqliteProjectStore implements ProjectStore {
   constructor(private readonly db: SqlDriver) {}
 
   private rowToProject(row: SqlRow): Project {
@@ -27,27 +21,27 @@ export class ProjectsRepository {
     };
   }
 
-  list(): Project[] {
+  async list(): Promise<Project[]> {
     return this.db.all('SELECT * FROM projects ORDER BY updated_at DESC').map((r) => this.rowToProject(r));
   }
 
-  get(projectId: string): Project | null {
+  async get(projectId: string): Promise<Project | null> {
     const row = this.db.get('SELECT * FROM projects WHERE id = ?', [projectId]);
     return row ? this.rowToProject(row) : null;
   }
 
-  findByRoot(rootPath: string): Project | null {
+  async findByRoot(rootPath: string): Promise<Project | null> {
     const row = this.db.get('SELECT * FROM projects WHERE root_path = ?', [rootPath]);
     return row ? this.rowToProject(row) : null;
   }
 
-  create(input: {
+  async create(input: {
     name: string;
     rootPath: string;
     description?: string;
     ignoredGlobs?: string[];
     settings?: Record<string, unknown>;
-  }): Project {
+  }): Promise<Project> {
     const projectId = id('prj');
     const ts = now();
     this.db.run(
@@ -64,14 +58,14 @@ export class ProjectsRepository {
         JSON.stringify(input.settings ?? {}),
       ],
     );
-    return this.get(projectId)!;
+    return (await this.get(projectId))!;
   }
 
-  update(
+  async update(
     projectId: string,
     patch: Partial<Pick<Project, 'name' | 'description' | 'ignoredGlobs' | 'settings' | 'lastIndexedAt' | 'indexVersion'>>,
-  ): Project | null {
-    const current = this.get(projectId);
+  ): Promise<Project | null> {
+    const current = await this.get(projectId);
     if (!current) return null;
     this.db.run(
       `UPDATE projects SET name = ?, description = ?, ignored_globs = ?, settings = ?,
@@ -87,17 +81,17 @@ export class ProjectsRepository {
         projectId,
       ],
     );
-    return this.get(projectId);
+    return await this.get(projectId);
   }
 
-  remove(projectId: string): boolean {
+  async remove(projectId: string): Promise<boolean> {
     const res = this.db.run('DELETE FROM projects WHERE id = ?', [projectId]);
     return res.changes > 0;
   }
 
   /* ----------------------------------------------------------- file index */
 
-  files(projectId: string): ProjectFileRecord[] {
+  async files(projectId: string): Promise<ProjectFileRecord[]> {
     return this.db
       .all(
         `SELECT id, project_id, rel_path, language, size, hash, lines, indexed_at
@@ -116,13 +110,13 @@ export class ProjectsRepository {
       }));
   }
 
-  filesByPath(projectId: string): Map<string, ProjectFileRecord> {
+  async filesByPath(projectId: string): Promise<Map<string, ProjectFileRecord>> {
     const map = new Map<string, ProjectFileRecord>();
-    for (const f of this.files(projectId)) map.set(f.relPath, f);
+    for (const f of await this.files(projectId)) map.set(f.relPath, f);
     return map;
   }
 
-  getFile(projectId: string, relPath: string): ProjectFileRecord | null {
+  async getFile(projectId: string, relPath: string): Promise<ProjectFileRecord | null> {
     const row = this.db.get('SELECT * FROM project_files WHERE project_id = ? AND rel_path = ?', [
       projectId,
       relPath,
@@ -140,7 +134,7 @@ export class ProjectsRepository {
     };
   }
 
-  upsertFile(projectId: string, file: IndexedFileInput): void {
+  async upsertFile(projectId: string, file: IndexedFileInput): Promise<void> {
     this.db.run(
       `INSERT INTO project_files (project_id, rel_path, language, size, hash, lines, indexed_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -151,12 +145,12 @@ export class ProjectsRepository {
     );
   }
 
-  deleteFile(projectId: string, relPath: string): void {
+  async deleteFile(projectId: string, relPath: string): Promise<void> {
     this.db.run('DELETE FROM project_files WHERE project_id = ? AND rel_path = ?', [projectId, relPath]);
     this.db.run('DELETE FROM file_chunks WHERE project_id = ? AND rel_path = ?', [projectId, relPath]);
   }
 
-  countFiles(projectId: string): number {
+  async countFiles(projectId: string): Promise<number> {
     const row = this.db.get<{ c: number }>('SELECT COUNT(*) AS c FROM project_files WHERE project_id = ?', [
       projectId,
     ]);
@@ -165,11 +159,11 @@ export class ProjectsRepository {
 
   /* ------------------------------------------------------------- chunks */
 
-  replaceChunks(
+  async replaceChunks(
     projectId: string,
     relPath: string,
     chunks: { startLine: number; endLine: number; content: string; tokens: string; hash: string }[],
-  ): void {
+  ): Promise<void> {
     this.db.transaction(() => {
       this.db.run(
         'DELETE FROM embeddings WHERE chunk_id IN (SELECT id FROM file_chunks WHERE project_id = ? AND rel_path = ?)',
@@ -186,15 +180,7 @@ export class ProjectsRepository {
     });
   }
 
-  chunks(projectId: string): {
-    id: number;
-    relPath: string;
-    startLine: number;
-    endLine: number;
-    content: string;
-    tokens: string;
-    hash: string;
-  }[] {
+  async chunks(projectId: string): Promise<ChunkRecord[]> {
     return this.db
       .all<SqlRow>(
         `SELECT id, rel_path, start_line, end_line, content, tokens, hash
@@ -202,7 +188,7 @@ export class ProjectsRepository {
         [projectId],
       )
       .map((r) => ({
-        id: Number(r.id),
+        id: String(r.id),
         relPath: String(r.rel_path),
         startLine: Number(r.start_line),
         endLine: Number(r.end_line),
@@ -214,7 +200,7 @@ export class ProjectsRepository {
 
   /* --------------------------------------------------------- index runs */
 
-  startIndexRun(projectId: string, indexVersion: number): string {
+  async startIndexRun(projectId: string, indexVersion: number): Promise<string> {
     const runId = id('idx');
     this.db.run(
       `INSERT INTO index_runs (id, project_id, started_at, index_version, status)
@@ -224,7 +210,7 @@ export class ProjectsRepository {
     return runId;
   }
 
-  finishIndexRun(runId: string, result: Omit<ScanResult, 'projectId' | 'durationMs'> & { error?: string }): void {
+  async finishIndexRun(runId: string, result: Omit<ScanResult, 'projectId' | 'durationMs'> & { error?: string }): Promise<void> {
     this.db.run(
       `UPDATE index_runs SET finished_at = ?, added = ?, modified = ?, removed = ?, unchanged = ?,
         skipped = ?, index_version = ?, status = ?, error = ? WHERE id = ?`,
@@ -243,10 +229,22 @@ export class ProjectsRepository {
     );
   }
 
-  recentIndexRuns(projectId: string, limit = 10) {
-    return this.db.all<SqlRow>(
-      'SELECT * FROM index_runs WHERE project_id = ? ORDER BY started_at DESC LIMIT ?',
-      [projectId, limit],
-    );
+  async recentIndexRuns(projectId: string, limit = 10): Promise<IndexRunRecord[]> {
+    return this.db
+      .all<SqlRow>('SELECT * FROM index_runs WHERE project_id = ? ORDER BY started_at DESC LIMIT ?', [projectId, limit])
+      .map((row) => ({
+        id: String(row.id),
+        projectId: String(row.project_id),
+        startedAt: Number(row.started_at),
+        finishedAt: row.finished_at === null ? null : Number(row.finished_at),
+        indexVersion: Number(row.index_version),
+        added: Number(row.added ?? 0),
+        modified: Number(row.modified ?? 0),
+        removed: Number(row.removed ?? 0),
+        unchanged: Number(row.unchanged ?? 0),
+        skipped: Number(row.skipped ?? 0),
+        status: String(row.status),
+        error: row.error === null ? null : String(row.error),
+      }));
   }
 }

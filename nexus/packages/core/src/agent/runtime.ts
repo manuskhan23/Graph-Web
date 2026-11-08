@@ -84,7 +84,7 @@ export class AgentRuntime {
     const startedAt = Date.now();
     const limits = this.deps.settings.get().agent;
     const role = AgentRoles.selectRole(options.message);
-    const task = this.createTask(options, role);
+    const task = await this.createTask(options, role);
 
     const approvals: AgentRunResult['approvals'] = [];
     const usage: AgentRunResult['usage'] = [];
@@ -98,11 +98,11 @@ export class AgentRuntime {
       if (!options.message.trim()) {
         throw new NexusError('VALIDATION_FAILED', 'A request is required');
       }
-      this.transition(task, 'planning');
+      await this.transition(task, 'planning');
       this.emit(task, 'task.started', `Task started: ${task.title}`);
 
       /* 2. CONTEXT RETRIEVAL ------------------------------------------------ */
-      const project = options.projectId ? this.deps.db.projects.get(options.projectId) : null;
+      const project = options.projectId ? await this.deps.db.projects.get(options.projectId) : null;
       const contextBundle = await this.deps.context.build({
         projectId: options.projectId,
         conversationId: options.conversationId ?? null,
@@ -120,13 +120,13 @@ export class AgentRuntime {
       const plan = await this.deps.planner.createPlan({
         request: options.message,
         projectName: project?.name,
-        projectSummary: project ? `indexed files: ${this.deps.db.projects.countFiles(project.id)}` : undefined,
+        projectSummary: project ? `indexed files: ${await this.deps.db.projects.countFiles(project.id)}` : undefined,
         agentRole: role,
       });
 
       /* 4. PLAN VALIDATION ------------------------------------------------- */
       const planSteps = plan.steps.map((step) => ({ ...step, status: 'pending' as const }));
-      this.deps.db.tasks.update(task.id, {
+      await this.deps.db.tasks.update(task.id, {
         plan: planSteps,
         agentRole: role,
         title: plan.title || task.title,
@@ -139,21 +139,21 @@ export class AgentRuntime {
       });
 
       /* 5–9. EXECUTE / OBSERVE / VERIFY / RECOVER --------------------------- */
-      this.transition(task, 'running');
-      const currentPlan = this.deps.db.tasks.get(task.id)!;
+      await this.transition(task, 'running');
+      const currentPlan = (await this.deps.db.tasks.get(task.id)) ?? task;
       const maxToolCalls = limits.maxToolCalls;
       const maxDuration = limits.maxDurationMs;
 
       for (const step of currentPlan.plan) {
         if (this.cancellations.has(task.id)) {
-          this.finish(task, 'cancelled', 'Cancelled by user', currentPlan);
+          await this.finish(task, 'cancelled', 'Cancelled by user', currentPlan);
           return this.buildResult(task.id, 'cancelled', 'Cancelled by user before completion.', currentPlan.plan, toolCalls, startedAt, false, approvals, usage);
         }
         await this.waitWhilePaused(task);
 
         if (Date.now() - startedAt > maxDuration) {
           const message = `Execution limit reached: ${maxDuration} ms elapsed`;
-          this.finish(task, 'failed', message, currentPlan);
+          await this.finish(task, 'failed', message, currentPlan);
           return this.buildResult(
             task.id,
             'failed',
@@ -169,13 +169,13 @@ export class AgentRuntime {
 
         // Dependencies must have completed. Read the LIVE plan: `currentPlan` is
         // a snapshot taken before this step's predecessors ran.
-        const livePlan = this.deps.db.tasks.get(task.id)?.plan ?? currentPlan.plan;
+        const livePlan = await (await this.deps.db.tasks.get(task.id))?.plan ?? currentPlan.plan;
         const blockedBy = step.dependsOn.filter((dep) => {
           const dependency = livePlan.find((s) => s.id === dep);
           return !dependency || dependency.status !== 'completed';
         });
         if (blockedBy.length > 0) {
-          this.updateStep(task.id, step.id, {
+          await this.updateStep(task.id, step.id, {
             status: 'skipped',
             error: `Blocked by incomplete dependency: ${blockedBy.join(', ')}`,
           });
@@ -185,19 +185,19 @@ export class AgentRuntime {
 
         if (!step.toolId) {
           // Pure reasoning step: recorded, nothing to execute.
-          this.updateStep(task.id, step.id, {
+          await this.updateStep(task.id, step.id, {
             status: 'completed',
             result: 'Reasoning step — no side effect required.',
             startedAt: Date.now(),
             finishedAt: Date.now(),
           });
-          this.recomputeProgress(task.id);
+          await this.recomputeProgress(task.id);
           continue;
         }
 
         if (toolCalls >= maxToolCalls) {
           const message = `Execution limit reached: ${maxToolCalls} tool calls used`;
-          this.finish(task, 'failed', message, currentPlan);
+          await this.finish(task, 'failed', message, currentPlan);
           return this.buildResult(
             task.id,
             'failed',
@@ -214,11 +214,11 @@ export class AgentRuntime {
         /* 6. PERMISSION CHECK + 7. TOOL EXECUTION ------------------------- */
         let attempt = 0;
         let outcome: ToolExecutionOutcome | null = null;
-        let stepInput = this.resolveStepInput(step, currentPlan.plan);
+        let stepInput = await this.resolveStepInput(step, currentPlan.plan);
 
         while (attempt <= limits.maxRetriesPerStep) {
           attempt += 1;
-          this.updateStep(task.id, step.id, { status: 'running', attempts: attempt, startedAt: Date.now() });
+          await this.updateStep(task.id, step.id, { status: 'running', attempts: attempt, startedAt: Date.now() });
           toolCalls += 1;
           outcome = await this.deps.registry.execute(step.toolId, stepInput, {
             projectId: options.projectId,
@@ -232,7 +232,7 @@ export class AgentRuntime {
           /* 8. OBSERVATION ------------------------------------------------- */
           observations.push({ toolId: step.toolId, observation: outcome.observation });
           if (outcome.data) {
-            this.deps.db.tasks.update(task.id, {
+            await this.deps.db.tasks.update(task.id, {
               checkpoint: { ...currentPlan.checkpoint, [step.id]: outcome.data },
             });
           }
@@ -241,19 +241,19 @@ export class AgentRuntime {
 
           if (outcome.denied) {
             // Approval rejection / permission denial: never retry, never bypass.
-            this.updateStep(task.id, step.id, {
+            await this.updateStep(task.id, step.id, {
               status: 'failed',
               error: outcome.error?.message ?? 'Denied',
               finishedAt: Date.now(),
             });
-            const approvalsList = this.deps.approvals.list('pending');
+            const approvalsList = await this.deps.approvals.list('pending');
             approvals.push(...approvalsList);
-            this.finish(task, 'failed', outcome.summary, currentPlan);
+            await this.finish(task, 'failed', outcome.summary, currentPlan);
             return this.buildResult(
               task.id,
               'failed',
               `Stopped: ${outcome.summary}. No further action was taken without approval.`,
-              this.deps.db.tasks.get(task.id)!.plan,
+              (await this.deps.db.tasks.get(task.id))!.plan,
               toolCalls,
               startedAt,
               false,
@@ -272,7 +272,7 @@ export class AgentRuntime {
         }
 
         if (!outcome || !outcome.ok) {
-          this.updateStep(task.id, step.id, {
+          await this.updateStep(task.id, step.id, {
             status: 'failed',
             error: outcome?.error?.message ?? 'Unknown failure',
             finishedAt: Date.now(),
@@ -280,7 +280,7 @@ export class AgentRuntime {
           });
           /* 9. RECOVERY: ask the model how to proceed, without executing it. */
           const diagnosis = await this.diagnose(task, step, outcome, observations);
-          this.finish(task, 'failed', outcome?.summary ?? 'Step failed', currentPlan);
+          await this.finish(task, 'failed', outcome?.summary ?? 'Step failed', currentPlan);
           return this.buildResult(
             task.id,
             'failed',
@@ -289,11 +289,11 @@ export class AgentRuntime {
               `Reason: ${outcome?.error?.message ?? 'unknown'}`,
               diagnosis ? `Diagnosis: ${diagnosis}` : '',
               '',
-              this.progressSummary(this.deps.db.tasks.get(task.id)!.plan),
+              this.progressSummary((await this.deps.db.tasks.get(task.id))!.plan),
             ]
               .filter(Boolean)
               .join('\n'),
-            this.deps.db.tasks.get(task.id)!.plan,
+            (await this.deps.db.tasks.get(task.id))!.plan,
             toolCalls,
             startedAt,
             false,
@@ -304,7 +304,7 @@ export class AgentRuntime {
 
         /* 10. RESULT VERIFICATION ----------------------------------------- */
         const verification = await this.verifyStep(task.id, step, outcome, options.projectId);
-        this.updateStep(task.id, step.id, {
+        await this.updateStep(task.id, step.id, {
           status: verification.ok ? 'completed' : 'failed',
           result: outcome.summary,
           error: verification.ok ? null : verification.reason,
@@ -313,14 +313,14 @@ export class AgentRuntime {
         if (verification.ok && step.verifyWith) verified = true;
         if (!verification.ok) {
           const diagnosis = await this.diagnose(task, step, outcome, observations);
-          this.finish(task, 'failed', verification.reason, currentPlan);
+          await this.finish(task, 'failed', verification.reason, currentPlan);
           return this.buildResult(
             task.id,
             'failed',
             `Step "${step.title}" ran but verification failed: ${verification.reason}.${
               diagnosis ? `\n\nDiagnosis: ${diagnosis}` : ''
             }`,
-            this.deps.db.tasks.get(task.id)!.plan,
+            (await this.deps.db.tasks.get(task.id))!.plan,
             toolCalls,
             startedAt,
             verified,
@@ -328,11 +328,11 @@ export class AgentRuntime {
             usage,
           );
         }
-        this.recomputeProgress(task.id);
+        await this.recomputeProgress(task.id);
       }
 
       /* 11. FINAL VERIFICATION + RESPONSE ---------------------------------- */
-      const finalState = this.deps.db.tasks.get(task.id)!;
+      const finalState = (await this.deps.db.tasks.get(task.id))!;
       // A task is complete only when EVERY planned step actually completed.
       // Steps skipped because a dependency never ran mean the plan did not hold.
       const allDone = finalState.plan.length > 0 && finalState.plan.every((s) => s.status === 'completed');
@@ -340,7 +340,7 @@ export class AgentRuntime {
 
       if (!allDone) {
         const skipped = finalState.plan.filter((s) => s.status === 'skipped');
-        this.finish(
+        await this.finish(
           task,
           'failed',
           skipped.length > 0 ? 'Steps were skipped because their dependencies did not complete' : 'Not all steps completed',
@@ -359,8 +359,8 @@ export class AgentRuntime {
         );
       }
 
-      this.finish(task, 'completed', null, finalState);
-      this.deps.db.observability.addNotification({
+      await this.finish(task, 'completed', null, finalState);
+      await this.deps.db.observability.addNotification({
         title: 'Task completed',
         body: finalState.title,
         level: 'success',
@@ -370,7 +370,7 @@ export class AgentRuntime {
         task.id,
         'completed',
         answer,
-        this.deps.db.tasks.get(task.id)!.plan,
+        (await this.deps.db.tasks.get(task.id))!.plan,
         toolCalls,
         startedAt,
         verified,
@@ -379,10 +379,10 @@ export class AgentRuntime {
       );
     } catch (err) {
       const nexus = toNexusError(err);
-      const latest = this.deps.db.tasks.get(task.id);
-      if (latest) this.finish(task, 'failed', nexus.message, latest);
+      const latest = await this.deps.db.tasks.get(task.id);
+      if (latest) await this.finish(task, 'failed', nexus.message, latest);
       this.deps.events.emit('task.failed', describeError(err), { code: nexus.code }, { taskId: task.id });
-      this.deps.db.observability.addNotification({
+      await this.deps.db.observability.addNotification({
         title: 'Task failed',
         body: nexus.message,
         level: 'error',
@@ -409,13 +409,13 @@ export class AgentRuntime {
 
   /** Resume an interrupted task from its persisted checkpoint. */
   async resume(taskId: string): Promise<AgentRunResult> {
-    const task = this.deps.db.tasks.get(taskId);
+    const task = await this.deps.db.tasks.get(taskId);
     if (!task) throw new NexusError('NOT_FOUND', `Task not found: ${taskId}`);
     if (task.status === 'completed' || task.status === 'cancelled') {
       throw new NexusError('TASK_STATE_INVALID', `Task is already ${task.status}`);
     }
     assertTransition(task.status, 'running');
-    this.deps.db.tasks.update(taskId, { status: 'running' });
+    await this.deps.db.tasks.update(taskId, { status: 'running' });
     // Re-execute the pending steps only.
     return this.run({
       projectId: task.projectId,
@@ -426,9 +426,9 @@ export class AgentRuntime {
 
   /* ------------------------------------------------------------- internals */
 
-  private createTask(options: RunOptions, role: string): TaskRecord {
+  private async createTask(options: RunOptions, role: string): Promise<TaskRecord> {
     const limits = this.deps.settings.get().agent;
-    if (this.deps.db.tasks.activeCount() >= limits.maxConcurrentTasks) {
+    if ((await this.deps.db.tasks.activeCount()) >= limits.maxConcurrentTasks) {
       throw new NexusError('AGENT_LIMIT_EXCEEDED', `Maximum concurrent tasks (${limits.maxConcurrentTasks}) reached`);
     }
     return this.deps.db.tasks.create({
@@ -441,17 +441,17 @@ export class AgentRuntime {
     });
   }
 
-  private transition(task: TaskRecord, next: TaskRecord['status']): void {
-    const current = this.deps.db.tasks.get(task.id)?.status ?? task.status;
+  private async transition(task: TaskRecord, next: TaskRecord['status']): Promise<void> {
+    const current = await (await this.deps.db.tasks.get(task.id))?.status ?? task.status;
     assertTransition(current, next);
-    this.deps.db.tasks.update(task.id, {
+    await this.deps.db.tasks.update(task.id, {
       status: next,
-      ...(next === 'running' ? { startedAt: this.deps.db.tasks.get(task.id)?.startedAt ?? Date.now() } : {}),
+      ...(next === 'running' ? { startedAt: await (await this.deps.db.tasks.get(task.id))?.startedAt ?? Date.now() } : {}),
     });
   }
 
-  private finish(task: TaskRecord, status: TaskRecord['status'], error: string | null, _plan: TaskRecord): void {
-    const current = this.deps.db.tasks.get(task.id);
+  private async finish(task: TaskRecord, status: TaskRecord['status'], error: string | null, _plan: TaskRecord): Promise<void> {
+    const current = await this.deps.db.tasks.get(task.id);
     if (!current) return;
     try {
       if (current.status !== status) {
@@ -462,7 +462,7 @@ export class AgentRuntime {
           /* the task is already terminal */
         }
       }
-      this.deps.db.tasks.update(task.id, {
+      await this.deps.db.tasks.update(task.id, {
         status,
         error,
         finishedAt: Date.now(),
@@ -475,7 +475,7 @@ export class AgentRuntime {
         { toolCalls: 0 },
         { taskId: task.id, projectId: task.projectId },
       );
-      this.deps.db.observability.addActivity({
+      await this.deps.db.observability.addActivity({
         kind: 'task',
         level: status === 'completed' ? 'info' : status === 'cancelled' ? 'warn' : 'error',
         title: `Task ${status}`,
@@ -494,18 +494,18 @@ export class AgentRuntime {
     this.deps.events.emit(type, message, data, { taskId: task.id, projectId: task.projectId });
   }
 
-  private updateStep(taskId: string, stepId: string, patch: Partial<PlanStep>): void {
-    const task = this.deps.db.tasks.get(taskId);
+  private async updateStep(taskId: string, stepId: string, patch: Partial<PlanStep>): Promise<void> {
+    const task = await this.deps.db.tasks.get(taskId);
     if (!task) return;
     const plan = task.plan.map((step) => (step.id === stepId ? { ...step, ...patch } : step));
-    this.deps.db.tasks.update(taskId, { plan });
+    await this.deps.db.tasks.update(taskId, { plan });
   }
 
-  private recomputeProgress(taskId: string): void {
-    const task = this.deps.db.tasks.get(taskId);
+  private async recomputeProgress(taskId: string): Promise<void> {
+    const task = await this.deps.db.tasks.get(taskId);
     if (!task || task.plan.length === 0) return;
     const done = task.plan.filter((s) => s.status === 'completed' || s.status === 'skipped').length;
-    this.deps.db.tasks.update(taskId, {
+    await this.deps.db.tasks.update(taskId, {
       progress: Number((done / task.plan.length).toFixed(3)),
       currentStepId: task.plan.find((s) => s.status === 'running')?.id ?? null,
     });
@@ -515,8 +515,8 @@ export class AgentRuntime {
   }
 
   /** Substitute `$stepId.key` references from earlier step checkpoints. */
-  private resolveStepInput(step: PlanStep, plan: PlanStep[]): Record<string, unknown> {
-    const task = this.deps.db.tasks.get(this.currentTaskId(step, plan) ?? '');
+  private async resolveStepInput(step: PlanStep, plan: PlanStep[]): Promise<Record<string, unknown>> {
+    const task = await this.deps.db.tasks.get((await this.currentTaskId(step, plan)) ?? '');
     const checkpoint = (task?.checkpoint ?? {}) as Record<string, unknown>;
     const resolve = (value: unknown): unknown => {
       if (typeof value === 'string' && value.startsWith('$')) {
@@ -539,10 +539,10 @@ export class AgentRuntime {
     return resolve(step.toolInput) as Record<string, unknown>;
   }
 
-  private currentTaskId(step: PlanStep, plan: PlanStep[]): string | null {
+  private async currentTaskId(step: PlanStep, plan: PlanStep[]): Promise<string | null> {
     // Plan steps do not carry the task id; the caller sets it on the task row.
     // We find the task that owns this exact plan array.
-    const tasks = this.deps.db.tasks.list({ limit: 20 });
+    const tasks = await this.deps.db.tasks.list({ limit: 20 });
     const match = tasks.find((t) => t.plan.some((s) => s.id === step.id) && t.plan.length === plan.length);
     return match?.id ?? null;
   }
@@ -568,7 +568,7 @@ export class AgentRuntime {
         if (!data?.applied || data.applied.length === 0) return { ok: false, reason: 'no files were written' };
         if (!projectId) return { ok: true, reason: `${data.applied.length} file(s) written` };
         // Confirm the files are actually on disk via the index.
-        const project = this.deps.db.projects.get(projectId);
+        const project = await this.deps.db.projects.get(projectId);
         if (!project) return { ok: true, reason: `${data.applied.length} file(s) written` };
         return { ok: true, reason: `${data.applied.length} file(s) written to ${project.rootPath}` };
       }

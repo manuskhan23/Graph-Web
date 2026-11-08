@@ -8,7 +8,7 @@
 import { z } from 'zod';
 import { NexusError } from '../errors.js';
 import type { Memory, MemoryCategory } from '../types.js';
-import type { MemoriesRepository } from '../storage/repositories/memories.js';
+import type { MemoryStore } from '../storage/contracts.js';
 import type { SettingsService } from '../settings/service.js';
 import { assertNoSecretValue, containsSecretValue } from '../security/invariants.js';
 import { id } from '../storage/driver.js';
@@ -33,7 +33,7 @@ export const memoryInputSchema = z.object({
 
 export class MemoryService {
   constructor(
-    private readonly repo: MemoriesRepository,
+    private readonly repo: MemoryStore,
     private readonly settings: SettingsService,
   ) {}
 
@@ -43,19 +43,19 @@ export class MemoryService {
     }
   }
 
-  list(filter: { projectId?: string | null; category?: MemoryCategory; limit?: number } = {}): Memory[] {
+  async list(filter: { projectId?: string | null; category?: MemoryCategory; limit?: number } = {}): Promise<Memory[]> {
     if (!this.settings.get().app.memoryEnabled) return [];
-    return this.repo.list(filter);
+    return await this.repo.list(filter);
   }
 
-  create(input: unknown): Memory {
+  async create(input: unknown): Promise<Memory> {
     this.ensureEnabled();
     const parsed = memoryInputSchema.safeParse(input);
     if (!parsed.success) {
       throw new NexusError('VALIDATION_FAILED', 'Invalid memory', { details: parsed.error.flatten() });
     }
     assertNoSecretValue(parsed.data.content, 'memory.create');
-    return this.repo.create({
+    return await this.repo.create({
       projectId: parsed.data.projectId ?? null,
       category: parsed.data.category,
       content: parsed.data.content,
@@ -64,7 +64,7 @@ export class MemoryService {
     });
   }
 
-  update(memoryId: string, patch: unknown): Memory {
+  async update(memoryId: string, patch: unknown): Promise<Memory> {
     this.ensureEnabled();
     const schema = z.object({
       content: z.string().min(3).max(4000).optional(),
@@ -74,27 +74,27 @@ export class MemoryService {
     const parsed = schema.safeParse(patch);
     if (!parsed.success) throw new NexusError('VALIDATION_FAILED', 'Invalid memory update');
     if (parsed.data.content) assertNoSecretValue(parsed.data.content, 'memory.update');
-    const updated = this.repo.update(memoryId, parsed.data);
+    const updated = await this.repo.update(memoryId, parsed.data);
     if (!updated) throw new NexusError('NOT_FOUND', `Memory not found: ${memoryId}`);
     return updated;
   }
 
-  remove(memoryId: string): void {
-    if (!this.repo.remove(memoryId)) throw new NexusError('NOT_FOUND', `Memory not found: ${memoryId}`);
+  async remove(memoryId: string): Promise<void> {
+    if (!await this.repo.remove(memoryId)) throw new NexusError('NOT_FOUND', `Memory not found: ${memoryId}`);
   }
 
-  search(term: string, projectId?: string | null): Memory[] {
+  async search(term: string, projectId?: string | null): Promise<Memory[]> {
     if (!this.settings.get().app.memoryEnabled) return [];
-    return this.repo.search(term, projectId);
+    return await this.repo.search(term, projectId);
   }
 
-  stats() {
-    return { byCategory: this.repo.countByCategory(), enabled: this.settings.get().app.memoryEnabled };
+  async stats(): Promise<{ byCategory: Record<string, number>; enabled: boolean }> {
+    return { byCategory: await this.repo.countByCategory(), enabled: this.settings.get().app.memoryEnabled };
   }
 
   /** JSON export. Secrets are filtered out defensively, not just on write. */
-  export(projectId?: string | null): string {
-    const memories = this.repo.list({ projectId: projectId ?? undefined, limit: 10_000 });
+  async export(projectId?: string | null): Promise<string> {
+    const memories = await this.repo.list({ projectId: projectId ?? undefined, limit: 10_000 });
     const safe = memories
       .filter((m) => !containsSecretValue(m.content))
       .map((m) => ({
@@ -110,7 +110,7 @@ export class MemoryService {
     return JSON.stringify({ version: 1, exportedAt: Date.now(), memories: safe }, null, 2);
   }
 
-  import(json: string, projectId?: string | null): { imported: number; skipped: number } {
+  async import(json: string, projectId?: string | null): Promise<{ imported: number; skipped: number }> {
     this.ensureEnabled();
     let parsed: unknown;
     try {
@@ -137,7 +137,7 @@ export class MemoryService {
         skipped += 1;
         continue;
       }
-      this.repo.create({
+      await this.repo.create({
         projectId: parsedItem.data.projectId ?? null,
         category: parsedItem.data.category,
         content: parsedItem.data.content,
@@ -150,12 +150,12 @@ export class MemoryService {
   }
 
   /** Called by the agent after a verified task to record durable outcomes. */
-  recordOutcome(input: { projectId: string | null; summary: string }): Memory | null {
+  async recordOutcome(input: { projectId: string | null; summary: string }): Promise<Memory | null> {
     if (!this.settings.get().app.memoryEnabled) return null;
     if (containsSecretValue(input.summary)) return null;
     const content = `Task outcome (${new Date().toISOString().slice(0, 10)}): ${input.summary.slice(0, 500)}`;
     try {
-      return this.repo.create({
+      return await this.repo.create({
         projectId: input.projectId,
         category: 'task_outcome',
         content,

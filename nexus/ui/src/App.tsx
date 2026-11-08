@@ -139,7 +139,9 @@ function Shell() {
             </span>
           </div>
           <div className="row between">
-            <span className="tiny dim">schema v{health?.database.version ?? '?'}</span>
+            <span className="tiny dim">
+              {health?.database.backend ?? 'storage'} · schema v{health?.database.version ?? '?'}
+            </span>
             <span className="tiny dim">{health?.providers.length ?? 0} providers</span>
           </div>
           {window.nexus && (

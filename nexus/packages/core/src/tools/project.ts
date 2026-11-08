@@ -66,8 +66,8 @@ export function createProjectTools(
     allowedRoles: [],
     async execute(input, ctx) {
       if (!ctx.projectId) throw new NexusError('VALIDATION_FAILED', 'A project is required');
-      const analysis = analyzer.analyze(ctx.projectId);
-      const project = db.projects.get(ctx.projectId);
+      const analysis = await analyzer.analyze(ctx.projectId);
+      const project = await db.projects.get(ctx.projectId);
       const focus = input.focus?.toLowerCase();
       const relevantFiles = focus
         ? analysis.files.filter(
@@ -125,8 +125,8 @@ export function createProjectTools(
     allowedRoles: [],
     async execute(_input, ctx) {
       if (!ctx.projectId) throw new NexusError('VALIDATION_FAILED', 'A project is required');
-      const analysis = analyzer.analyze(ctx.projectId);
-      const project = db.projects.get(ctx.projectId);
+      const analysis = await analyzer.analyze(ctx.projectId);
+      const project = await db.projects.get(ctx.projectId);
       const pkgPath = project ? `${project.rootPath}/package.json` : '';
       let deps: Record<string, string> = {};
       try {

@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, unlinkSync 
 import { dirname, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { config } from '../config.js';
+import type { SnapshotFileRecord, SnapshotRecord } from '../storage/contracts.js';
 import { NexusError } from '../errors.js';
 import type { Database } from '../storage/db.js';
 import { resolveInsideProject, resolveInsideProjectReal } from '../security/paths.js';
@@ -41,8 +42,8 @@ export class SnapshotService {
     return join(config.artifactDir, 'blobs', hash.slice(0, 2), `${hash}.txt`);
   }
 
-  capture(options: CaptureOptions): string {
-    const project = this.db.projects.get(options.projectId);
+  async capture(options: CaptureOptions): Promise<string> {
+    const project = await this.db.projects.get(options.projectId);
     if (!project) throw new NexusError('NOT_FOUND', `Project not found: ${options.projectId}`);
 
     const files: { relPath: string; hash: string; existed: boolean; blobPath: string | null; content: string | null }[] = [];
@@ -68,11 +69,8 @@ export class SnapshotService {
       digest.update(`${relPath}:${hash}`);
 
       // Reuse an existing blob with identical content (dedupe across snapshots).
-      const existing = this.db.db.get<{ blob_path: string | null }>(
-        'SELECT blob_path FROM snapshot_files WHERE hash = ? AND blob_path IS NOT NULL LIMIT 1',
-        [hash],
-      );
-      let blob: string | null = existing?.blob_path ?? null;
+      const existing = await this.db.snapshots.findBlobByHash(hash);
+      let blob: string | null = existing;
       let inline: string | null = null;
 
       if (buffer.length > INLINE_LIMIT) {
@@ -87,7 +85,7 @@ export class SnapshotService {
       files.push({ relPath, hash, existed: true, blobPath: blob, content: inline });
     }
 
-    const record = this.db.snapshots.create({
+    const record = await this.db.snapshots.create({
       projectId: options.projectId,
       operationId: options.operationId,
       kind: options.kind ?? 'pre-change',
@@ -98,7 +96,7 @@ export class SnapshotService {
       files,
     });
 
-    this.db.observability.addActivity({
+    await this.db.observability.addActivity({
       kind: 'system',
       level: 'info',
       title: `Snapshot: ${options.label}`,
@@ -113,37 +111,41 @@ export class SnapshotService {
   }
 
   /** Full-project capture (used before destructive project operations). */
-  captureProject(projectId: string, label: string, operationId = id('op')): string {
-    const files = this.db.projects.files(projectId).map((f) => f.relPath);
+  async captureProject(projectId: string, label: string, operationId = id('op')): Promise<string> {
+    const files = (await this.db.projects.files(projectId)).map((f) => f.relPath);
     return this.capture({ projectId, relPaths: files, operationId, label, kind: 'manual' });
   }
 
-  list(projectId: string) {
-    return this.db.snapshots.list(projectId).map((s) => ({
-      ...s,
-      fileCount: this.db.snapshots.files(s.id).length,
-    }));
+  async list(projectId: string) {
+    const snapshots = await this.db.snapshots.list(projectId);
+    const withCounts = [];
+    for (const snapshot of snapshots) {
+      withCounts.push({ ...snapshot, fileCount: (await this.db.snapshots.files(snapshot.id)).length });
+    }
+    return withCounts;
   }
 
-  detail(snapshotId: string) {
-    const snapshot = this.db.snapshots.get(snapshotId);
+  async detail(
+    snapshotId: string,
+  ): Promise<SnapshotRecord & { files: SnapshotFileRecord[] }> {
+    const snapshot = await this.db.snapshots.get(snapshotId);
     if (!snapshot) throw new NexusError('NOT_FOUND', `Snapshot not found: ${snapshotId}`);
-    return { ...snapshot, files: this.db.snapshots.files(snapshotId) };
+    return { ...snapshot, files: await this.db.snapshots.files(snapshotId) };
   }
 
   /** Restore selected files (or all) from a snapshot. */
-  restore(snapshotId: string, relPaths?: string[]): RestoreResult {
-    const snapshot = this.db.snapshots.get(snapshotId);
+  async restore(snapshotId: string, relPaths?: string[]): Promise<RestoreResult> {
+    const snapshot = await this.db.snapshots.get(snapshotId);
     if (!snapshot) throw new NexusError('NOT_FOUND', `Snapshot not found: ${snapshotId}`);
-    const project = this.db.projects.get(snapshot.projectId);
+    const project = await this.db.projects.get(snapshot.projectId);
     if (!project) throw new NexusError('NOT_FOUND', 'Project for snapshot no longer exists');
 
-    const all = this.db.snapshots.files(snapshotId);
+    const all = await this.db.snapshots.files(snapshotId);
     const targets = relPaths ? all.filter((f) => relPaths.includes(f.relPath)) : all;
     if (targets.length === 0) throw new NexusError('VALIDATION_FAILED', 'No matching files in snapshot');
 
     // Snapshot the current state first so the restore is reversible.
-    const safety = this.capture({
+    const safety = await this.capture({
       projectId: snapshot.projectId,
       relPaths: targets.map((t) => t.relPath),
       operationId: id('op'),
@@ -172,7 +174,7 @@ export class SnapshotService {
       (existed ? restored : created).push(target.relPath);
     }
 
-    this.db.observability.addActivity({
+    await this.db.observability.addActivity({
       kind: 'system',
       level: 'warn',
       title: `Restored snapshot: ${snapshot.label}`,
@@ -187,15 +189,12 @@ export class SnapshotService {
   }
 
   /** Retention policy — never deletes data inside the configured window. */
-  applyRetention(days = config.retention.snapshotDays): { snapshots: number; blobs: number } {
-    const { snapshots, blobs } = this.db.snapshots.expire(days);
+  async applyRetention(days = config.retention.snapshotDays): Promise<{ snapshots: number; blobs: number }> {
+    const { snapshots, blobs } = await this.db.snapshots.expire(days);
     let removedBlobs = 0;
     for (const blob of blobs) {
       // Only remove a blob if no remaining snapshot file references it.
-      const stillUsed = this.db.db.get(
-        'SELECT 1 FROM snapshot_files WHERE blob_path = ? LIMIT 1',
-        [blob],
-      );
+      const stillUsed = await this.db.snapshots.blobInUse(blob);
       if (!stillUsed) {
         try {
           unlinkSync(blob);
@@ -206,7 +205,7 @@ export class SnapshotService {
       }
     }
     if (snapshots > 0) {
-      this.db.observability.addActivity({
+      await this.db.observability.addActivity({
         kind: 'system',
         level: 'info',
         title: 'Snapshot retention applied',
@@ -221,26 +220,23 @@ export class SnapshotService {
   }
 
   /** Diff between a snapshot file and the current working tree file. */
-  diffWithCurrent(snapshotId: string, relPath: string): { before: string; after: string; changed: boolean } {
-    const snapshot = this.db.snapshots.get(snapshotId);
+  async diffWithCurrent(snapshotId: string, relPath: string): Promise<{ before: string; after: string; changed: boolean }> {
+    const snapshot = await this.db.snapshots.get(snapshotId);
     if (!snapshot) throw new NexusError('NOT_FOUND', 'Snapshot not found');
-    const project = this.db.projects.get(snapshot.projectId);
+    const project = await this.db.projects.get(snapshot.projectId);
     if (!project) throw new NexusError('NOT_FOUND', 'Project not found');
-    const file = this.db.snapshots.files(snapshotId).find((f) => f.relPath === relPath);
+    const file = (await this.db.snapshots.files(snapshotId)).find((f) => f.relPath === relPath);
     const before = file?.content ?? (file?.blobPath ? readBlob(file.blobPath)?.toString('utf8') ?? '' : '');
     const abs = resolveInsideProjectReal(project.rootPath, relPath);
     const after = existsSync(abs) ? readFileSync(abs, 'utf8') : '';
     return { before, after, changed: before !== after };
   }
 
-  purgeProject(projectId: string): void {
-    for (const snapshot of this.db.snapshots.list(projectId, 10_000)) {
-      for (const file of this.db.snapshots.files(snapshot.id)) {
+  async purgeProject(projectId: string): Promise<void> {
+    for (const snapshot of await this.db.snapshots.list(projectId, 10_000)) {
+      for (const file of await this.db.snapshots.files(snapshot.id)) {
         if (file.blobPath) {
-          const used = this.db.db.get('SELECT 1 FROM snapshot_files WHERE blob_path = ? AND snapshot_id != ? LIMIT 1', [
-            file.blobPath,
-            snapshot.id,
-          ]);
+          const used = await this.db.snapshots.blobInUse(file.blobPath, snapshot.id);
           if (!used && existsSync(file.blobPath)) {
             try {
               rmSync(file.blobPath);

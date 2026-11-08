@@ -1,30 +1,9 @@
 import type { SqlDriver, SqlRow } from '../driver.js';
 import { id, now, parseJson } from '../driver.js';
+import type { SnapshotFileRecord, SnapshotRecord, SnapshotStore } from '../contracts.js';
+export type { SnapshotFileRecord, SnapshotRecord } from '../contracts.js';
 
-export interface SnapshotRecord {
-  id: string;
-  projectId: string;
-  operationId: string | null;
-  kind: 'pre-change' | 'manual' | 'scheduled';
-  label: string;
-  createdAt: number;
-  hash: string;
-  size: number;
-  metadata: Record<string, unknown>;
-}
-
-export interface SnapshotFileRecord {
-  id: number;
-  snapshotId: string;
-  relPath: string;
-  hash: string;
-  existed: boolean;
-  blobPath: string | null;
-  /** Inline content for small files; large files live in blob_path. */
-  content: string | null;
-}
-
-export class SnapshotsRepository {
+export class SqliteSnapshotStore implements SnapshotStore {
   constructor(private readonly db: SqlDriver) {}
 
   private map(row: SqlRow): SnapshotRecord {
@@ -41,7 +20,7 @@ export class SnapshotsRepository {
     };
   }
 
-  create(input: {
+  async create(input: {
     projectId: string;
     operationId: string | null;
     kind: SnapshotRecord['kind'];
@@ -50,7 +29,7 @@ export class SnapshotsRepository {
     size: number;
     metadata?: Record<string, unknown>;
     files: { relPath: string; hash: string; existed: boolean; blobPath: string | null; content: string | null }[];
-  }): SnapshotRecord {
+  }): Promise<SnapshotRecord> {
     const snapshotId = id('snap');
     this.db.transaction(() => {
       this.db.run(
@@ -76,15 +55,15 @@ export class SnapshotsRepository {
         );
       }
     });
-    return this.get(snapshotId)!;
+    return (await this.get(snapshotId))!;
   }
 
-  get(snapshotId: string): SnapshotRecord | null {
+  async get(snapshotId: string): Promise<SnapshotRecord | null> {
     const row = this.db.get('SELECT * FROM file_snapshots WHERE id = ?', [snapshotId]);
     return row ? this.map(row) : null;
   }
 
-  list(projectId: string, limit = 100): SnapshotRecord[] {
+  async list(projectId: string, limit = 100): Promise<SnapshotRecord[]> {
     return this.db
       .all('SELECT * FROM file_snapshots WHERE project_id = ? ORDER BY created_at DESC LIMIT ?', [
         projectId,
@@ -93,9 +72,9 @@ export class SnapshotsRepository {
       .map((r) => this.map(r));
   }
 
-  files(snapshotId: string): SnapshotFileRecord[] {
+  async files(snapshotId: string): Promise<SnapshotFileRecord[]> {
     return this.db.all('SELECT * FROM snapshot_files WHERE snapshot_id = ?', [snapshotId]).map((r) => ({
-      id: Number(r.id),
+      id: String(r.id),
       snapshotId: String(r.snapshot_id),
       relPath: String(r.rel_path),
       hash: String(r.hash),
@@ -105,7 +84,7 @@ export class SnapshotsRepository {
     }));
   }
 
-  findByOperation(operationId: string): SnapshotRecord | null {
+  async findByOperation(operationId: string): Promise<SnapshotRecord | null> {
     const row = this.db.get('SELECT * FROM file_snapshots WHERE operation_id = ? ORDER BY created_at DESC LIMIT 1', [
       operationId,
     ]);
@@ -113,12 +92,12 @@ export class SnapshotsRepository {
   }
 
   /** Retention: drop snapshots older than `days`, returning blob paths to remove. */
-  expire(days: number): { snapshots: number; blobs: string[] } {
+  async expire(days: number): Promise<{ snapshots: number; blobs: string[] }> {
     const cutoff = now() - days * 86_400_000;
     const old = this.db.all<SqlRow>('SELECT id FROM file_snapshots WHERE created_at < ?', [cutoff]);
     const blobs: string[] = [];
     for (const row of old) {
-      for (const f of this.files(String(row.id))) if (f.blobPath) blobs.push(f.blobPath);
+      for (const f of await this.files(String(row.id))) if (f.blobPath) blobs.push(f.blobPath);
     }
     if (old.length) {
       this.db.run('DELETE FROM file_snapshots WHERE created_at < ?', [cutoff]);
@@ -126,7 +105,27 @@ export class SnapshotsRepository {
     return { snapshots: old.length, blobs };
   }
 
-  count(projectId?: string): number {
+  /** Blob dedupe: an identical file hash already written somewhere? */
+  async findBlobByHash(hash: string): Promise<string | null> {
+    const row = this.db.get<{ blob_path: string | null }>(
+      'SELECT blob_path FROM snapshot_files WHERE hash = ? AND blob_path IS NOT NULL LIMIT 1',
+      [hash],
+    );
+    return row?.blob_path ? String(row.blob_path) : null;
+  }
+
+  /** Is this blob still referenced by any snapshot other than `exceptSnapshotId`? */
+  async blobInUse(blobPath: string, exceptSnapshotId?: string): Promise<boolean> {
+    const row = exceptSnapshotId
+      ? this.db.get('SELECT 1 FROM snapshot_files WHERE blob_path = ? AND snapshot_id != ? LIMIT 1', [
+          blobPath,
+          exceptSnapshotId,
+        ])
+      : this.db.get('SELECT 1 FROM snapshot_files WHERE blob_path = ? LIMIT 1', [blobPath]);
+    return Boolean(row);
+  }
+
+  async count(projectId?: string): Promise<number> {
     const row = projectId
       ? this.db.get<{ c: number }>('SELECT COUNT(*) AS c FROM file_snapshots WHERE project_id = ?', [projectId])
       : this.db.get<{ c: number }>('SELECT COUNT(*) AS c FROM file_snapshots');

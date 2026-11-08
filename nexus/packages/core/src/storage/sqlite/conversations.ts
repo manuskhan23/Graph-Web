@@ -1,4 +1,5 @@
 import { id, now, parseJson, type SqlDriver, type SqlRow } from '../driver.js';
+import type { ConversationStore } from '../contracts.js';
 
 export interface Conversation {
   id: string;
@@ -21,7 +22,7 @@ export interface Message {
   createdAt: number;
 }
 
-export class ConversationsRepository {
+export class SqliteConversationStore implements ConversationStore {
   constructor(private readonly db: SqlDriver) {}
 
   private mapConversation(row: SqlRow): Conversation {
@@ -49,19 +50,19 @@ export class ConversationsRepository {
     };
   }
 
-  list(projectId?: string | null): Conversation[] {
+  async list(projectId?: string | null): Promise<Conversation[]> {
     const rows = projectId
       ? this.db.all('SELECT * FROM conversations WHERE project_id = ? ORDER BY updated_at DESC', [projectId])
       : this.db.all('SELECT * FROM conversations ORDER BY updated_at DESC LIMIT 100');
     return rows.map((r) => this.mapConversation(r));
   }
 
-  get(conversationId: string): Conversation | null {
+  async get(conversationId: string): Promise<Conversation | null> {
     const row = this.db.get('SELECT * FROM conversations WHERE id = ?', [conversationId]);
     return row ? this.mapConversation(row) : null;
   }
 
-  create(input: { projectId: string | null; title: string }): Conversation {
+  async create(input: { projectId: string | null; title: string }): Promise<Conversation> {
     const conversationId = id('conv');
     const ts = now();
     this.db.run('INSERT INTO conversations (id, project_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', [
@@ -71,18 +72,18 @@ export class ConversationsRepository {
       ts,
       ts,
     ]);
-    return this.get(conversationId)!;
+    return (await this.get(conversationId))!;
   }
 
-  rename(conversationId: string, title: string): void {
+  async rename(conversationId: string, title: string): Promise<void> {
     this.db.run('UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?', [title, now(), conversationId]);
   }
 
-  remove(conversationId: string): boolean {
+  async remove(conversationId: string): Promise<boolean> {
     return this.db.run('DELETE FROM conversations WHERE id = ?', [conversationId]).changes > 0;
   }
 
-  messages(conversationId: string, limit = 200): Message[] {
+  async messages(conversationId: string, limit = 200): Promise<Message[]> {
     return this.db
       .all(
         `SELECT * FROM (SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT ?)
@@ -92,7 +93,7 @@ export class ConversationsRepository {
       .map((r) => this.mapMessage(r));
   }
 
-  addMessage(input: {
+  async addMessage(input: {
     conversationId: string;
     role: Message['role'];
     content: string;
@@ -101,7 +102,7 @@ export class ConversationsRepository {
     toolCalls?: unknown[];
     attachments?: Message['attachments'];
     tokens?: number | null;
-  }): Message {
+  }): Promise<Message> {
     const messageId = id('msg');
     const ts = now();
     this.db.run(
@@ -126,7 +127,7 @@ export class ConversationsRepository {
   }
 
   /** Previous chats are real context: the agent runtime reads this history. */
-  recentHistory(conversationId: string, limit = 12): Message[] {
-    return this.messages(conversationId, limit);
+  async recentHistory(conversationId: string, limit = 12): Promise<Message[]> {
+    return await this.messages(conversationId, limit);
   }
 }

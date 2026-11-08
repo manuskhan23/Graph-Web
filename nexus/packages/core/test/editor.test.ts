@@ -2,23 +2,23 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { makeProject } from './fixtures.js';
+import { makeProject, type TempProject } from './fixtures.js';
 import { EditorService } from '../src/editor/service.js';
 import { SnapshotService } from '../src/snapshots/service.js';
 import { NexusError } from '../src/errors.js';
 import { buildFileDiff } from '../src/editor/diff.js';
 
-function services(project: ReturnType<typeof makeProject>) {
+function services(project: TempProject) {
   const snapshots = new SnapshotService(project.db);
   const editor = new EditorService(project.db, snapshots);
   return { snapshots, editor };
 }
 
-test('staging produces diffs without touching disk, apply writes once', () => {
-  const project = makeProject({ 'src/a.ts': 'export const a = 1;\n' });
+test('staging produces diffs without touching disk, apply writes once', async () => {
+  const project = await makeProject({ 'src/a.ts': 'export const a = 1;\n' });
   const { editor } = services(project);
 
-  const staged = editor.stage(project.projectId, [
+  const staged = await editor.stage(project.projectId, [
     { kind: 'write', relPath: 'src/a.ts', content: 'export const a = 2;\n' },
     { kind: 'create', relPath: 'src/b.ts', content: 'export const b = 1;\n' },
   ], 'Change a, add b');
@@ -32,7 +32,7 @@ test('staging produces diffs without touching disk, apply writes once', () => {
   assert.equal(readFileSync(join(project.dir, 'src/a.ts'), 'utf8'), 'export const a = 1;\n');
   assert.ok(!existsSync(join(project.dir, 'src/b.ts')));
 
-  const result = editor.apply(staged.operationId);
+  const result = await editor.apply(staged.operationId);
   assert.deepEqual(result.applied.sort(), ['src/a.ts', 'src/b.ts']);
   assert.equal(readFileSync(join(project.dir, 'src/a.ts'), 'utf8'), 'export const a = 2;\n');
   assert.equal(readFileSync(join(project.dir, 'src/b.ts'), 'utf8'), 'export const b = 1;\n');
@@ -41,33 +41,33 @@ test('staging produces diffs without touching disk, apply writes once', () => {
   project.cleanup();
 });
 
-test('hash conflict detection blocks silent overwrite of user edits', () => {
-  const project = makeProject({ 'src/a.ts': 'export const a = 1;\n' });
+test('hash conflict detection blocks silent overwrite of user edits', async () => {
+  const project = await makeProject({ 'src/a.ts': 'export const a = 1;\n' });
   const { editor } = services(project);
-  const original = editor.readFile(project.projectId, 'src/a.ts');
+  const original = await editor.readFile(project.projectId, 'src/a.ts');
 
-  const staged = editor.stage(project.projectId, [
+  const staged = await editor.stage(project.projectId, [
     { kind: 'write', relPath: 'src/a.ts', content: 'agent version\n', expectedHash: original.hash },
   ]);
 
   // The user edits the file after the agent inspected it.
   writeFileSync(join(project.dir, 'src/a.ts'), 'user version\n');
 
-  assert.throws(
-    () => editor.apply(staged.operationId),
+  assert.rejects(
+    async () => await editor.apply(staged.operationId),
     (err: unknown) => err instanceof NexusError && err.code === 'CONFLICT',
   );
   assert.equal(readFileSync(join(project.dir, 'src/a.ts'), 'utf8'), 'user version\n');
   project.cleanup();
 });
 
-test('stale expected hash is rejected at stage time', () => {
-  const project = makeProject({ 'src/a.ts': 'original\n' });
+test('stale expected hash is rejected at stage time', async () => {
+  const project = await makeProject({ 'src/a.ts': 'original\n' });
   const { editor } = services(project);
   writeFileSync(join(project.dir, 'src/a.ts'), 'changed by user\n');
-  assert.throws(
-    () =>
-      editor.stage(project.projectId, [
+  assert.rejects(
+    async () =>
+      await editor.stage(project.projectId, [
         { kind: 'write', relPath: 'src/a.ts', content: 'x', expectedHash: 'deadbeef' },
       ]),
     (err: unknown) => err instanceof NexusError && err.code === 'CONFLICT',
@@ -75,41 +75,41 @@ test('stale expected hash is rejected at stage time', () => {
   project.cleanup();
 });
 
-test('replace requires an unambiguous match', () => {
-  const project = makeProject({ 'src/a.ts': 'const x = 1;\nconst x = 1;\n' });
+test('replace requires an unambiguous match', async () => {
+  const project = await makeProject({ 'src/a.ts': 'const x = 1;\nconst x = 1;\n' });
   const { editor } = services(project);
-  assert.throws(
-    () => editor.stage(project.projectId, [{ kind: 'replace', relPath: 'src/a.ts', search: 'const x = 1;', replace: 'const x = 2;' }]),
+  assert.rejects(
+    async () => await editor.stage(project.projectId, [{ kind: 'replace', relPath: 'src/a.ts', search: 'const x = 1;', replace: 'const x = 2;' }]),
     (err: unknown) => err instanceof NexusError && err.code === 'CONFLICT' && /ambiguous/.test(err.message),
   );
-  assert.throws(
-    () => editor.stage(project.projectId, [{ kind: 'replace', relPath: 'src/a.ts', search: 'not here', replace: 'x' }]),
+  assert.rejects(
+    async () => await editor.stage(project.projectId, [{ kind: 'replace', relPath: 'src/a.ts', search: 'not here', replace: 'x' }]),
     (err: unknown) => err instanceof NexusError && err.code === 'CONFLICT',
   );
 
-  const staged = editor.stage(project.projectId, [
+  const staged = await editor.stage(project.projectId, [
     { kind: 'replace', relPath: 'src/a.ts', search: 'const x = 1;\nconst x = 1;\n', replace: 'const x = 2;\nconst x = 1;\n' },
   ]);
-  editor.apply(staged.operationId);
+  await editor.apply(staged.operationId);
   assert.equal(readFileSync(join(project.dir, 'src/a.ts'), 'utf8'), 'const x = 2;\nconst x = 1;\n');
   project.cleanup();
 });
 
-test('create refuses to clobber and delete/move work through the snapshot pipeline', () => {
-  const project = makeProject({ 'src/a.ts': 'a\n', 'src/keep.ts': 'keep\n' });
+test('create refuses to clobber and delete/move work through the snapshot pipeline', async () => {
+  const project = await makeProject({ 'src/a.ts': 'a\n', 'src/keep.ts': 'keep\n' });
   const { editor } = services(project);
 
-  assert.throws(
-    () => editor.stage(project.projectId, [{ kind: 'create', relPath: 'src/a.ts', content: 'x' }]),
+  assert.rejects(
+    async () => await editor.stage(project.projectId, [{ kind: 'create', relPath: 'src/a.ts', content: 'x' }]),
     (err: unknown) => err instanceof NexusError && err.code === 'CONFLICT',
   );
 
-  const staged = editor.stage(project.projectId, [
+  const staged = await editor.stage(project.projectId, [
     { kind: 'move', relPath: 'src/keep.ts', to: 'src/moved/keep.ts' },
     { kind: 'delete', relPath: 'src/a.ts' },
     { kind: 'mkdir', relPath: 'src/newdir' },
   ]);
-  editor.apply(staged.operationId);
+  await editor.apply(staged.operationId);
 
   assert.ok(!existsSync(join(project.dir, 'src/a.ts')));
   assert.ok(existsSync(join(project.dir, 'src/moved/keep.ts')));
@@ -117,29 +117,29 @@ test('create refuses to clobber and delete/move work through the snapshot pipeli
   project.cleanup();
 });
 
-test('editor rejects traversal and protected paths', () => {
-  const project = makeProject({ 'src/a.ts': 'a\n' });
+test('editor rejects traversal and protected paths', async () => {
+  const project = await makeProject({ 'src/a.ts': 'a\n' });
   const { editor } = services(project);
-  assert.throws(
-    () => editor.stage(project.projectId, [{ kind: 'create', relPath: '../escape.txt', content: 'x' }]),
+  assert.rejects(
+    async () => await editor.stage(project.projectId, [{ kind: 'create', relPath: '../escape.txt', content: 'x' }]),
     (err: unknown) => err instanceof NexusError,
   );
-  assert.throws(
-    () => editor.stage(project.projectId, [{ kind: 'write', relPath: '.git/config', content: 'x' }]),
+  assert.rejects(
+    async () => await editor.stage(project.projectId, [{ kind: 'write', relPath: '.git/config', content: 'x' }]),
     (err: unknown) => err instanceof NexusError && err.code === 'PERMISSION_DENIED',
   );
-  assert.throws(
-    () => editor.readFile(project.projectId, '.env'),
+  assert.rejects(
+    async () => await editor.readFile(project.projectId, '.env'),
     (err: unknown) => err instanceof NexusError && err.code === 'SENSITIVE_DATA_BLOCKED',
   );
   project.cleanup();
 });
 
-test('snapshots restore file content and are themselves reversible', () => {
-  const project = makeProject({ 'src/a.ts': 'version 1\n', 'src/b.ts': 'b1\n' });
+test('snapshots restore file content and are themselves reversible', async () => {
+  const project = await makeProject({ 'src/a.ts': 'version 1\n', 'src/b.ts': 'b1\n' });
   const { snapshots, editor } = services(project);
 
-  const snapshotId = snapshots.capture({
+  const snapshotId = await snapshots.capture({
     projectId: project.projectId,
     relPaths: ['src/a.ts'],
     operationId: 'op1',
@@ -147,31 +147,31 @@ test('snapshots restore file content and are themselves reversible', () => {
   });
   writeFileSync(join(project.dir, 'src/a.ts'), 'version 2\n');
 
-  const restored = snapshots.restore(snapshotId);
+  const restored = await snapshots.restore(snapshotId);
   assert.deepEqual(restored.restored, ['src/a.ts']);
   assert.equal(readFileSync(join(project.dir, 'src/a.ts'), 'utf8'), 'version 1\n');
   // A safety snapshot of the pre-restore state was taken.
   assert.ok(restored.safetySnapshotId);
 
-  const safety = snapshots.detail(restored.safetySnapshotId!);
+  const safety = await snapshots.detail(restored.safetySnapshotId!);
   assert.equal(safety.files[0]!.content, 'version 2\n');
 
   // Restore the safety snapshot → back to version 2 (rollback is reversible).
-  snapshots.restore(restored.safetySnapshotId!);
+  await snapshots.restore(restored.safetySnapshotId!);
   assert.equal(readFileSync(join(project.dir, 'src/a.ts'), 'utf8'), 'version 2\n');
 
-  assert.equal(snapshots.list(project.projectId).length, 3);
-  const diff = snapshots.diffWithCurrent(snapshotId, 'src/a.ts');
+  assert.equal((await snapshots.list(project.projectId)).length, 3);
+  const diff = await snapshots.diffWithCurrent(snapshotId, 'src/a.ts');
   assert.equal(diff.changed, true);
   assert.equal(diff.before, 'version 1\n');
   assert.equal(diff.after, 'version 2\n');
   project.cleanup();
 });
 
-test('restore recreates files that were deleted and removes files that were created', () => {
-  const project = makeProject({ 'src/old.ts': 'old\n' });
+test('restore recreates files that were deleted and removes files that were created', async () => {
+  const project = await makeProject({ 'src/old.ts': 'old\n' });
   const { snapshots } = services(project);
-  const snapshotId = snapshots.capture({
+  const snapshotId = await snapshots.capture({
     projectId: project.projectId,
     relPaths: ['src/old.ts', 'src/ghost.ts'],
     operationId: 'op2',
@@ -180,7 +180,7 @@ test('restore recreates files that were deleted and removes files that were crea
   writeFileSync(join(project.dir, 'src/ghost.ts'), 'created later\n');
   writeFileSync(join(project.dir, 'src/temp.ts'), 'temp\n');
 
-  const second = snapshots.capture({
+  const second = await snapshots.capture({
     projectId: project.projectId,
     relPaths: ['src/temp.ts'],
     operationId: 'op3',
@@ -189,23 +189,23 @@ test('restore recreates files that were deleted and removes files that were crea
   assert.ok(second);
 
   // Capture a snapshot that recorded ghost.ts as non-existent, then delete it.
-  const restoreResult = snapshots.restore(snapshotId);
+  const restoreResult = await snapshots.restore(snapshotId);
   assert.ok(!existsSync(join(project.dir, 'src/ghost.ts')), 'file absent in snapshot should be removed on restore');
   assert.ok(restoreResult.deleted.includes('src/ghost.ts'));
   project.cleanup();
 });
 
-test('snapshot retention only expires data outside the window', () => {
-  const project = makeProject({ 'src/a.ts': 'a\n' });
+test('snapshot retention only expires data outside the window', async () => {
+  const project = await makeProject({ 'src/a.ts': 'a\n' });
   const { snapshots } = services(project);
-  snapshots.capture({ projectId: project.projectId, relPaths: ['src/a.ts'], operationId: 'op', label: 'recent' });
-  const result = snapshots.applyRetention(30);
+  await snapshots.capture({ projectId: project.projectId, relPaths: ['src/a.ts'], operationId: 'op', label: 'recent' });
+  const result = await snapshots.applyRetention(30);
   assert.equal(result.snapshots, 0);
-  assert.equal(snapshots.list(project.projectId).length, 1);
+  assert.equal((await snapshots.list(project.projectId)).length, 1);
   project.cleanup();
 });
 
-test('diff builder reports additions, deletions and line numbers', () => {
+test('diff builder reports additions, deletions and line numbers', async () => {
   const diff = buildFileDiff('src/x.ts', 'a\nb\nc\n', 'a\nB\nc\nd\n');
   assert.equal(diff.additions, 2);
   assert.equal(diff.deletions, 1);

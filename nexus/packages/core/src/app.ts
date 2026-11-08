@@ -81,9 +81,11 @@ export async function createApp(options: CreateAppOptions = {}): Promise<NexusAp
   // Dynamic imports keep the heavy test-only paths out of production startup.
   const db =
     options.db ??
-    (options.test ? (await import('./storage/db.js')).createTestDatabase() : getDatabase());
+    (options.test ? await (await import('./storage/db.js')).createTestDatabase() : await getDatabase());
 
   const settings = new SettingsService(db.observability);
+  // Hydrate the synchronous settings cache from the store exactly once.
+  await settings.load();
 
   const router = new ModelRouter({
     settings,

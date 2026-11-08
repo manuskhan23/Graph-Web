@@ -10,13 +10,14 @@ import type {
   ToolExecutionRecord,
 } from '../../types.js';
 import { id, now, parseJson, type SqlDriver, type SqlRow } from '../driver.js';
+import type { AuditEntry, JobRecord, ObservabilityStore } from '../contracts.js';
 
-export class ObservabilityRepository {
+export class SqliteObservabilityStore implements ObservabilityStore {
   constructor(private readonly db: SqlDriver) {}
 
   /* ------------------------------------------------------------ activity */
 
-  addActivity(entry: Omit<ActivityEntry, 'id' | 'at'> & { at?: number }): number {
+  async addActivity(entry: Omit<ActivityEntry, 'id' | 'at'> & { at?: number }): Promise<string> {
     const res = this.db.run(
       `INSERT INTO activity_logs (at, kind, level, title, detail, project_id, task_id, provider, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -32,10 +33,10 @@ export class ObservabilityRepository {
         entry.status,
       ],
     );
-    return res.lastInsertRowid;
+    return String(res.lastInsertRowid);
   }
 
-  activity(filter: { kind?: string; level?: string; limit?: number; projectId?: string } = {}): ActivityEntry[] {
+  async activity(filter: { kind?: string; level?: string; limit?: number; projectId?: string } = {}): Promise<ActivityEntry[]> {
     const where: string[] = [];
     const params: (string | number)[] = [];
     if (filter.kind) {
@@ -73,7 +74,7 @@ export class ObservabilityRepository {
 
   /* ------------------------------------------------------ notifications */
 
-  addNotification(input: { title: string; body: string; level: NotificationEntry['level'] }): NotificationEntry {
+  async addNotification(input: { title: string; body: string; level: NotificationEntry['level'] }): Promise<NotificationEntry> {
     const notificationId = id('ntf');
     this.db.run('INSERT INTO notifications (id, at, title, body, level, is_read) VALUES (?, ?, ?, ?, ?, 0)', [
       notificationId,
@@ -82,10 +83,10 @@ export class ObservabilityRepository {
       input.body,
       input.level,
     ]);
-    return this.notifications(1)[0]!;
+    return (await this.notifications(1))[0]!;
   }
 
-  notifications(limit = 50): NotificationEntry[] {
+  async notifications(limit = 50): Promise<NotificationEntry[]> {
     return this.db.all('SELECT * FROM notifications ORDER BY at DESC LIMIT ?', [limit]).map((r) => ({
       id: String(r.id),
       at: Number(r.at),
@@ -96,22 +97,22 @@ export class ObservabilityRepository {
     }));
   }
 
-  markNotificationRead(notificationId: string): void {
+  async markNotificationRead(notificationId: string): Promise<void> {
     this.db.run('UPDATE notifications SET is_read = 1 WHERE id = ?', [notificationId]);
   }
 
-  markAllNotificationsRead(): void {
+  async markAllNotificationsRead(): Promise<void> {
     this.db.run('UPDATE notifications SET is_read = 1 WHERE is_read = 0');
   }
 
-  unreadNotificationCount(): number {
+  async unreadNotificationCount(): Promise<number> {
     const row = this.db.get<{ c: number }>('SELECT COUNT(*) AS c FROM notifications WHERE is_read = 0');
     return Number(row?.c ?? 0);
   }
 
   /* ------------------------------------------------------- tool records */
 
-  addToolExecution(record: Omit<ToolExecutionRecord, 'id' | 'createdAt'>): string {
+  async addToolExecution(record: Omit<ToolExecutionRecord, 'id' | 'createdAt'>): Promise<string> {
     const execId = id('exec');
     this.db.run(
       `INSERT INTO tool_executions (id, task_id, project_id, tool_id, tool_input, output, status, risk, duration_ms, error, created_at)
@@ -133,7 +134,7 @@ export class ObservabilityRepository {
     return execId;
   }
 
-  toolExecutions(filter: { taskId?: string; limit?: number } = {}): (ToolExecutionRecord & { id: string })[] {
+  async toolExecutions(filter: { taskId?: string; limit?: number } = {}): Promise<(ToolExecutionRecord & { id: string })[]> {
     const params: (string | number)[] = [];
     let where = '';
     if (filter.taskId) {
@@ -158,17 +159,17 @@ export class ObservabilityRepository {
 
   /* --------------------------------------------------------- approvals */
 
-  createApproval(input: Omit<ApprovalRequest, 'id' | 'createdAt' | 'status' | 'resolvedAt' | 'resolvedBy'>): ApprovalRequest {
+  async createApproval(input: Omit<ApprovalRequest, 'id' | 'createdAt' | 'status' | 'resolvedAt' | 'resolvedBy'>): Promise<ApprovalRequest> {
     const approvalId = id('apr');
     this.db.run(
       `INSERT INTO approvals (id, task_id, kind, title, detail, risk, payload, status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
       [approvalId, input.taskId, input.kind, input.title, input.detail, input.risk, JSON.stringify(input.payload), now()],
     );
-    return this.getApproval(approvalId)!;
+    return (await this.getApproval(approvalId))!;
   }
 
-  getApproval(approvalId: string): ApprovalRequest | null {
+  async getApproval(approvalId: string): Promise<ApprovalRequest | null> {
     const row = this.db.get('SELECT * FROM approvals WHERE id = ?', [approvalId]);
     return row ? this.mapApproval(row) : null;
   }
@@ -189,7 +190,7 @@ export class ObservabilityRepository {
     };
   }
 
-  approvals(filter: { status?: ApprovalRequest['status']; limit?: number } = {}): ApprovalRequest[] {
+  async approvals(filter: { status?: ApprovalRequest['status']; limit?: number } = {}): Promise<ApprovalRequest[]> {
     const params: (string | number)[] = [];
     let where = '';
     if (filter.status) {
@@ -200,23 +201,23 @@ export class ObservabilityRepository {
     return this.db.all(`SELECT * FROM approvals ${where} ORDER BY created_at DESC LIMIT ?`, params).map((r) => this.mapApproval(r));
   }
 
-  resolveApproval(
+  async resolveApproval(
     approvalId: string,
     status: 'approved' | 'rejected' | 'expired',
     by = 'user',
-  ): ApprovalRequest | null {
+  ): Promise<ApprovalRequest | null> {
     this.db.run('UPDATE approvals SET status = ?, resolved_at = ?, resolved_by = ? WHERE id = ?', [
       status,
       now(),
       by,
       approvalId,
     ]);
-    return this.getApproval(approvalId);
+    return await this.getApproval(approvalId);
   }
 
   /* ------------------------------------------------------ provider usage */
 
-  recordUsage(record: Omit<ProviderUsageRecord, 'id' | 'createdAt'>): void {
+  async recordUsage(record: Omit<ProviderUsageRecord, 'id' | 'createdAt'>): Promise<void> {
     this.db.run(
       `INSERT INTO provider_usage (provider, model_id, purpose, input_tokens, output_tokens, tokens_source,
         latency_ms, ok, error_class, cost_usd, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -236,9 +237,9 @@ export class ObservabilityRepository {
     );
   }
 
-  usage(limit = 200): ProviderUsageRecord[] {
+  async usage(limit = 200): Promise<ProviderUsageRecord[]> {
     return this.db.all('SELECT * FROM provider_usage ORDER BY created_at DESC LIMIT ?', [limit]).map((r) => ({
-      id: Number(r.id),
+      id: String(r.id),
       provider: String(r.provider) as ProviderId,
       modelId: String(r.model_id),
       purpose: String(r.purpose),
@@ -255,7 +256,7 @@ export class ObservabilityRepository {
 
   /* ----------------------------------------------------------- audit log */
 
-  audit(input: { actor: string; action: string; subject?: string; allowed: boolean; reason?: string; metadata?: unknown }): void {
+  async audit(input: { actor: string; action: string; subject?: string; allowed: boolean; reason?: string; metadata?: unknown }): Promise<void> {
     this.db.run(
       'INSERT INTO audit_log (at, actor, action, subject, allowed, reason, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
@@ -270,13 +271,22 @@ export class ObservabilityRepository {
     );
   }
 
-  auditEntries(limit = 100) {
-    return this.db.all('SELECT * FROM audit_log ORDER BY at DESC LIMIT ?', [limit]);
+  async auditEntries(limit = 100): Promise<AuditEntry[]> {
+    return this.db.all<SqlRow>('SELECT * FROM audit_log ORDER BY at DESC LIMIT ?', [limit]).map((row) => ({
+      id: String(row.id),
+      at: Number(row.at),
+      actor: String(row.actor),
+      action: String(row.action),
+      subject: String(row.subject ?? ''),
+      allowed: Number(row.allowed) === 1,
+      reason: String(row.reason ?? ''),
+      metadata: parseJson<unknown>(row.metadata, {}),
+    }));
   }
 
   /* --------------------------------------------------------------- jobs */
 
-  upsertJob(job: { id: string; kind: string; referenceId?: string | null; status: string; progress: number; message: string }): void {
+  async upsertJob(job: { id: string; kind: string; referenceId?: string | null; status: string; progress: number; message: string }): Promise<void> {
     const ts = now();
     this.db.run(
       `INSERT INTO jobs (id, kind, reference_id, status, progress, message, created_at, updated_at)
@@ -287,8 +297,17 @@ export class ObservabilityRepository {
     );
   }
 
-  jobs(limit = 50) {
-    return this.db.all('SELECT * FROM jobs ORDER BY updated_at DESC LIMIT ?', [limit]);
+  async jobs(limit = 50): Promise<JobRecord[]> {
+    return this.db.all<SqlRow>('SELECT * FROM jobs ORDER BY updated_at DESC LIMIT ?', [limit]).map((row) => ({
+      id: String(row.id),
+      kind: String(row.kind),
+      referenceId: row.reference_id === null ? null : String(row.reference_id),
+      status: String(row.status),
+      progress: Number(row.progress),
+      message: String(row.message),
+      createdAt: Number(row.created_at),
+      updatedAt: Number(row.updated_at),
+    }));
   }
 
   /* ---------------------------------------------------------- analytics */
@@ -297,7 +316,7 @@ export class ObservabilityRepository {
    * Every number below is a SQL aggregate over real rows. Nothing is invented:
    * `null` is returned when there is no data to aggregate.
    */
-  analytics(): AnalyticsSnapshot {
+  async analytics(): Promise<AnalyticsSnapshot> {
     const taskRows = this.db.all<{ status: string; c: number; avg_ms: number | null }>(
       `SELECT status, COUNT(*) AS c, AVG(CASE WHEN finished_at IS NOT NULL AND started_at IS NOT NULL
         THEN finished_at - started_at END) AS avg_ms FROM tasks GROUP BY status`,
@@ -376,13 +395,13 @@ export class ObservabilityRepository {
 
   /* --------------------------------------------------------- app settings */
 
-  getSetting<T>(key: string, fallback: T): T {
+  async getSetting<T>(key: string, fallback: T): Promise<T> {
     const row = this.db.get<{ value: string }>('SELECT value FROM app_settings WHERE key = ?', [key]);
     if (!row) return fallback;
     return parseJson<T>(row.value, fallback);
   }
 
-  setSetting(key: string, value: unknown): void {
+  async setSetting(key: string, value: unknown): Promise<void> {
     this.db.run(
       `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
@@ -392,13 +411,13 @@ export class ObservabilityRepository {
 
   /* ------------------------------------------------------------ agents */
 
-  upsertAgent(agent: {
+  async upsertAgent(agent: {
     role: string;
     name: string;
     description: string;
     allowedTools: string[];
     mayWriteFiles: boolean;
-  }): void {
+  }): Promise<void> {
     this.db.run(
       `INSERT INTO agents (role, name, description, allowed_tools, may_write_files) VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(role) DO UPDATE SET name = excluded.name, description = excluded.description,
@@ -407,7 +426,7 @@ export class ObservabilityRepository {
     );
   }
 
-  agents(): { role: string; name: string; description: string; allowedTools: string[]; mayWriteFiles: boolean }[] {
+  async agents(): Promise<{ role: string; name: string; description: string; allowedTools: string[]; mayWriteFiles: boolean }[]> {
     return this.db.all('SELECT * FROM agents ORDER BY role').map((r) => ({
       role: String(r.role),
       name: String(r.name),

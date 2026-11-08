@@ -16,7 +16,7 @@ import { tokenize, uniqueTerms } from '../search/tokenizer.js';
 import { condense } from './chunker.js';
 import { estimateTokens } from '../providers/models.js';
 import { ProjectAnalyzer } from '../project/analyzer.js';
-import type { Conversation, Message } from '../storage/repositories/conversations.js';
+import type { Conversation, Message } from '../types.js';
 import type { ProjectAnalysis } from '../types.js';
 
 export interface ContextSource {
@@ -126,9 +126,9 @@ export class ContextManager {
     });
 
     /* 2. User preferences (memories of category preference/coding_standard). */
-    const preferences = this.db.memories
-      .list({ projectId: input.projectId, limit: 60 })
-      .filter((m) => m.category === 'preference' || m.category === 'coding_standard');
+    const preferences = (await this.db.memories.list({ projectId: input.projectId, limit: 60 })).filter(
+      (m) => m.category === 'preference' || m.category === 'coding_standard',
+    );
     const preferenceText = preferences.length
       ? `User preferences and standards:\n${preferences.map((m) => `- ${m.content}`).join('\n')}`
       : '';
@@ -142,9 +142,9 @@ export class ContextManager {
     /* 3. Project context (cached static analysis + summary). */
     let projectSection = '';
     if (input.projectId) {
-      const project = this.db.projects.get(input.projectId);
+      const project = await this.db.projects.get(input.projectId);
       if (project) {
-        const analysis = this.getAnalysis(input.projectId, project.indexVersion);
+        const analysis = await this.getAnalysis(input.projectId, project.indexVersion);
         const projectFacts = [
           `Project: ${project.name}`,
           analysis ? `Overview: ${analysis.overview}` : 'Project has not been analysed yet.',
@@ -170,7 +170,7 @@ export class ContextManager {
     }
 
     /* 4. Relevant memories (decisions, outcomes, commands). */
-    const relevantMemories = this.selectMemories(input.projectId, input.userMessage);
+    const relevantMemories = await this.selectMemories(input.projectId, input.userMessage);
     const memoryText = relevantMemories.length
       ? `Relevant memories:\n${relevantMemories.map((m) => `- [${m.category}] ${m.content}`).join('\n')}`
       : '';
@@ -201,7 +201,7 @@ export class ContextManager {
     /* 6. Conversation history (summarised when long). */
     let historySection = '';
     const history = input.conversationId
-      ? this.db.conversations.recentHistory(input.conversationId, 24)
+      ? await this.db.conversations.recentHistory(input.conversationId, 24)
       : [];
     if (history.length > 0) {
       const rendered = this.renderHistory(history);
@@ -262,11 +262,11 @@ export class ContextManager {
 
   /* ------------------------------------------------------------- internals */
 
-  private getAnalysis(projectId: string, indexVersion: number): ProjectAnalysis | null {
+  private async getAnalysis(projectId: string, indexVersion: number): Promise<ProjectAnalysis | null> {
     const cached = this.analysisCache.get(projectId);
     if (cached && cached.version === indexVersion) return cached.analysis;
     try {
-      const analysis = new ProjectAnalyzer(this.db).analyze(projectId);
+      const analysis = await new ProjectAnalyzer(this.db).analyze(projectId);
       this.analysisCache.set(projectId, { version: indexVersion, analysis });
       return analysis;
     } catch {
@@ -274,9 +274,9 @@ export class ContextManager {
     }
   }
 
-  private selectMemories(projectId: string | null, userMessage: string): Memory[] {
+  private async selectMemories(projectId: string | null, userMessage: string): Promise<Memory[]> {
     const terms = new Set(uniqueTerms(userMessage));
-    const all = this.db.memories.list({ projectId, limit: 150 });
+    const all = await this.db.memories.list({ projectId, limit: 150 });
     const scored = all.map((memory) => {
       const overlap = tokenize(memory.content).filter((t) => terms.has(t)).length;
       return { memory, score: overlap * 2 + memory.importance * 0.5 };
@@ -311,4 +311,4 @@ export class ContextManager {
   }
 }
 
-export type { Conversation };
+export type { Conversation } from '../types.js';

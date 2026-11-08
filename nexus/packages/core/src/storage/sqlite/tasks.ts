@@ -1,7 +1,8 @@
 import type { PlanStep, TaskRecord, TaskStatus } from '../../types.js';
 import { id, now, parseJson, type SqlDriver, type SqlRow } from '../driver.js';
+import type { TaskStore } from '../contracts.js';
 
-export class TasksRepository {
+export class SqliteTaskStore implements TaskStore {
   constructor(private readonly db: SqlDriver) {}
 
   private map(row: SqlRow): TaskRecord {
@@ -25,7 +26,7 @@ export class TasksRepository {
     };
   }
 
-  list(filter: { status?: TaskStatus; projectId?: string | null; limit?: number } = {}): TaskRecord[] {
+  async list(filter: { status?: TaskStatus; projectId?: string | null; limit?: number } = {}): Promise<TaskRecord[]> {
     const where: string[] = [];
     const params: (string | number)[] = [];
     if (filter.status) {
@@ -46,12 +47,12 @@ export class TasksRepository {
       .map((r) => this.map(r));
   }
 
-  get(taskId: string): TaskRecord | null {
+  async get(taskId: string): Promise<TaskRecord | null> {
     const row = this.db.get('SELECT * FROM tasks WHERE id = ?', [taskId]);
     return row ? this.map(row) : null;
   }
 
-  create(input: {
+  async create(input: {
     projectId: string | null;
     conversationId?: string | null;
     title: string;
@@ -59,7 +60,7 @@ export class TasksRepository {
     agentRole?: TaskRecord['agentRole'];
     status?: TaskStatus;
     priority?: number;
-  }): TaskRecord {
+  }): Promise<TaskRecord> {
     const taskId = id('task');
     this.db.run(
       `INSERT INTO tasks (id, project_id, conversation_id, title, description, status, priority, agent_role, created_at)
@@ -76,11 +77,11 @@ export class TasksRepository {
         now(),
       ],
     );
-    return this.get(taskId)!;
+    return (await this.get(taskId))!;
   }
 
-  update(taskId: string, patch: Partial<TaskRecord>): TaskRecord | null {
-    const current = this.get(taskId);
+  async update(taskId: string, patch: Partial<TaskRecord>): Promise<TaskRecord | null> {
+    const current = await this.get(taskId);
     if (!current) return null;
     this.db.run(
       `UPDATE tasks SET title = ?, description = ?, status = ?, priority = ?, agent_role = ?, plan = ?,
@@ -103,25 +104,25 @@ export class TasksRepository {
         taskId,
       ],
     );
-    return this.get(taskId);
+    return await this.get(taskId);
   }
 
   /** Tasks left mid-flight by a crash — used by interruption recovery. */
-  interrupted(): TaskRecord[] {
+  async interrupted(): Promise<TaskRecord[]> {
     return this.db
       .all("SELECT * FROM tasks WHERE status IN ('running','planning') ORDER BY created_at")
       .map((r) => this.map(r));
   }
 
-  activeCount(): number {
+  async activeCount(): Promise<number> {
     const row = this.db.get<{ c: number }>(
       "SELECT COUNT(*) AS c FROM tasks WHERE status IN ('running','planning','awaiting_approval')",
     );
     return Number(row?.c ?? 0);
   }
 
-  completedStepIds(taskId: string): string[] {
-    const task = this.get(taskId);
+  async completedStepIds(taskId: string): Promise<string[]> {
+    const task = await this.get(taskId);
     return task ? task.plan.filter((s) => s.status === 'completed').map((s) => s.id) : [];
   }
 }

@@ -54,9 +54,9 @@ async function main(): Promise<void> {
 async function seedDemo(nexus: Awaited<ReturnType<typeof buildServer>>['nexus']): Promise<void> {
   const candidate = resolve(process.cwd(), '..');
   if (!existsSync(candidate)) return;
-  const existing = nexus.db.projects.findByRoot(candidate);
+  const existing = await nexus.db.projects.findByRoot(candidate);
   if (existing) return;
-  const project = nexus.db.projects.create({
+  const project = await nexus.db.projects.create({
     name: 'Graph-Web',
     rootPath: candidate,
     description: 'Seeded demo project (MyGraph web app)',

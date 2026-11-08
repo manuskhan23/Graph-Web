@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeProject } from './fixtures.js';
+import { makeProject, type TempProject } from './fixtures.js';
 import { createApp } from '../src/app.js';
 import { EventBus } from '../src/events/bus.js';
 import { MockProvider } from './mocks.js';
 import { evaluateCondition, builtinTemplates } from '../src/workflows/engine.js';
 
-async function appFor(project: ReturnType<typeof makeProject>) {
+async function appFor(project: TempProject) {
   return createApp({
     test: true,
     db: project.db,
@@ -16,11 +16,11 @@ async function appFor(project: ReturnType<typeof makeProject>) {
 }
 
 test('workflow executes a linear chain and records every block', async () => {
-  const project = makeProject({ 'src/a.ts': 'export const a = 1;\n' });
+  const project = await makeProject({ 'src/a.ts': 'export const a = 1;\n' });
   const app = await appFor(project);
   await app.indexer.index(project.projectId);
 
-  const workflow = app.db.workflows.create({
+  const workflow = await app.db.workflows.create({
     name: 'scan then list',
     projectId: project.projectId,
     blocks: [
@@ -40,9 +40,9 @@ test('workflow executes a linear chain and records every block', async () => {
 });
 
 test('a failing block stops the workflow with an error', async () => {
-  const project = makeProject({});
+  const project = await makeProject({});
   const app = await appFor(project);
-  const workflow = app.db.workflows.create({
+  const workflow = await app.db.workflows.create({
     name: 'failing',
     projectId: project.projectId,
     blocks: [
@@ -57,9 +57,9 @@ test('a failing block stops the workflow with an error', async () => {
 });
 
 test('condition blocks route to onFalse when the expression is false', async () => {
-  const project = makeProject({});
+  const project = await makeProject({});
   const app = await appFor(project);
-  const workflow = app.db.workflows.create({
+  const workflow = await app.db.workflows.create({
     name: 'branching',
     projectId: project.projectId,
     blocks: [
@@ -77,9 +77,9 @@ test('condition blocks route to onFalse when the expression is false', async () 
 });
 
 test('workflow can be paused and resumed from its cursor', async () => {
-  const project = makeProject({});
+  const project = await makeProject({});
   const app = await appFor(project);
-  const workflow = app.db.workflows.create({
+  const workflow = await app.db.workflows.create({
     name: 'pausable',
     projectId: project.projectId,
     blocks: [
@@ -90,9 +90,16 @@ test('workflow can be paused and resumed from its cursor', async () => {
     entry: 'd1',
   });
   // Pause after the first block has run.
+  // Deliberately not awaited: the run must still be in flight when we pause it.
   const runPromise = app.workflows.run({ workflowId: workflow.id, projectId: project.projectId });
-  const pending = project.db.workflows.allExecutions(1)[0]!;
-  app.workflows.pause(pending.id);
+  let pending = (await project.db.workflows.allExecutions(1))[0];
+  // The execution row is written asynchronously; wait for it to appear.
+  for (let i = 0; i < 50 && !pending; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    pending = (await project.db.workflows.allExecutions(1))[0];
+  }
+  assert.ok(pending, 'execution row was never persisted');
+  await app.workflows.pause(pending.id);
   const paused = await runPromise;
   assert.equal(paused.status, 'paused');
   assert.ok(paused.cursor);
@@ -103,9 +110,9 @@ test('workflow can be paused and resumed from its cursor', async () => {
 });
 
 test('a cycle of blocks is bounded by the block execution limit', async () => {
-  const project = makeProject({});
+  const project = await makeProject({});
   const app = await appFor(project);
-  const workflow = app.db.workflows.create({
+  const workflow = await app.db.workflows.create({
     name: 'loop',
     projectId: project.projectId,
     blocks: [
@@ -120,7 +127,7 @@ test('a cycle of blocks is bounded by the block execution limit', async () => {
   project.cleanup();
 });
 
-test('condition evaluator supports comparisons without eval', () => {
+test('condition evaluator supports comparisons without eval', async () => {
   const vars = { count: 3, text: 'hello world', nested: { value: 10 }, flag: true };
   assert.equal(evaluateCondition('count > 2', vars), true);
   assert.equal(evaluateCondition('count < 2', vars), false);
@@ -137,7 +144,7 @@ test('condition evaluator supports comparisons without eval', () => {
   assert.equal(evaluateCondition('require("fs")', vars), false);
 });
 
-test('builtin templates are real, connected definitions', () => {
+test('builtin templates are real, connected definitions', async () => {
   const templates = builtinTemplates(null);
   assert.equal(templates.length, 3);
   for (const template of templates) {

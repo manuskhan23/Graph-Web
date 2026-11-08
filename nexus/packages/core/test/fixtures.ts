@@ -19,23 +19,23 @@ export function writeFiles(root: string, files: Record<string, string>): void {
   }
 }
 
-export function makeProject(files: Record<string, string> = {}): TempProject {
+export async function makeProject(files: Record<string, string> = {}): Promise<TempProject> {
   const dir = mkdtempSync(join(tmpdir(), 'nexus-test-'));
   writeFiles(dir, { 'package.json': JSON.stringify({ name: 'fixture', scripts: { build: 'tsc' } }), ...files });
-  const db = createTestDatabase();
-  const project = db.projects.create({ name: 'fixture', rootPath: dir });
+  const db = await createTestDatabase();
+  const project = await db.projects.create({ name: 'fixture', rootPath: dir });
   return {
     dir,
     db,
     projectId: project.id,
     cleanup() {
-      db.close();
+      void db.close();
       rmSync(dir, { recursive: true, force: true });
     },
   };
 }
 
-export function makeEmptyDb(): Database {
+export async function makeEmptyDb(): Promise<Database> {
   return createTestDatabase();
 }
 

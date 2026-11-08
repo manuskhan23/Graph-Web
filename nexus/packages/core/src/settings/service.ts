@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { BUILTIN_IGNORE_GLOBS, config } from '../config.js';
 import { NexusError } from '../errors.js';
 import type { AppSettings, SettingsResponse } from '../types.js';
-import type { ObservabilityRepository } from '../storage/repositories/observability.js';
+import type { ObservabilityStore } from '../storage/contracts.js';
 import { keyStore } from '../security/keys.js';
 import { DEFAULT_MODELS } from '../providers/models.js';
 
@@ -80,15 +80,35 @@ export const DEFAULT_SETTINGS: AppSettings = {
 const SETTINGS_KEY = 'app.settings';
 
 export class SettingsService {
-  constructor(private readonly store: ObservabilityRepository) {}
+  /**
+   * Settings are read synchronously in hot paths (limits are consulted per step),
+   * but every store is async. The cache below is the synchronous view; it is
+   * hydrated by `load()` before the app serves requests and rewritten by
+   * `update()` / `reset()`, so it never drifts from the database.
+   */
+  private cached: Partial<AppSettings> = {};
+  private hydrated = false;
+
+  constructor(private readonly store: ObservabilityStore) {}
+
+  /** Read persisted settings into the synchronous cache. Call once at startup. */
+  async load(): Promise<AppSettings> {
+    this.cached = await this.store.getSetting<Partial<AppSettings>>(SETTINGS_KEY, {});
+    this.hydrated = true;
+    return this.get();
+  }
 
   get(): AppSettings {
-    const stored = this.store.getSetting<Partial<AppSettings>>(SETTINGS_KEY, {});
-    return deepMerge(DEFAULT_SETTINGS, stored);
+    return deepMerge(DEFAULT_SETTINGS, this.cached);
+  }
+
+  /** True once `load()` has run, so callers can tell defaults from stored values. */
+  get isHydrated(): boolean {
+    return this.hydrated;
   }
 
   /** Validate then persist a partial patch. Returns the merged, effective settings. */
-  update(patch: unknown): AppSettings {
+  async update(patch: unknown): Promise<AppSettings> {
     const parsed = settingsSchema.safeParse(patch);
     if (!parsed.success) {
       throw new NexusError('VALIDATION_FAILED', 'Invalid settings payload', {
@@ -96,12 +116,15 @@ export class SettingsService {
       });
     }
     const merged = deepMerge(this.get(), parsed.data as Partial<AppSettings>);
-    this.store.setSetting(SETTINGS_KEY, merged);
+    this.cached = merged as Partial<AppSettings>;
+    this.hydrated = true;
+    await this.store.setSetting(SETTINGS_KEY, merged);
     return merged;
   }
 
-  reset(): AppSettings {
-    this.store.setSetting(SETTINGS_KEY, {});
+  async reset(): Promise<AppSettings> {
+    this.cached = {};
+    await this.store.setSetting(SETTINGS_KEY, {});
     return this.get();
   }
 
@@ -110,9 +133,9 @@ export class SettingsService {
     return { settings: this.get(), keys: keyStore.all() };
   }
 
-  setApiKey(provider: 'gemini' | 'groq', key: string): SettingsResponse {
+  async setApiKey(provider: 'gemini' | 'groq', key: string): Promise<SettingsResponse> {
     keyStore.set(provider, key);
-    this.store.audit({
+    await this.store.audit({
       actor: 'user',
       action: 'key.set',
       subject: provider,
@@ -122,9 +145,9 @@ export class SettingsService {
     return this.response();
   }
 
-  clearApiKey(provider: 'gemini' | 'groq'): SettingsResponse {
+  async clearApiKey(provider: 'gemini' | 'groq'): Promise<SettingsResponse> {
     keyStore.clear(provider);
-    this.store.audit({ actor: 'user', action: 'key.clear', subject: provider, allowed: true });
+    await this.store.audit({ actor: 'user', action: 'key.clear', subject: provider, allowed: true });
     return this.response();
   }
 

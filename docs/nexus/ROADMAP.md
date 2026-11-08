@@ -142,6 +142,23 @@ Layers 0–8 are built. See `COMPLETION_MATRIX.md` for the per-feature verdict w
 - Drag-and-drop workflow canvas (definitions are authored via templates/API and rendered for inspection).
 - Any fabricated analytics: undefined metrics render as `—`, with the reason shown.
 
+### Storage: dual backend, async everywhere
+
+SQLite (default) and MongoDB are both implemented behind one set of async store interfaces
+(`storage/contracts.ts`). The backend is selected by `MONGODB_URI` and reported by `GET /api/health`
+(`{ backend, location, version, serverVersion }`).
+
+| Backend | Status | Evidence |
+| --- | --- | --- |
+| SQLite | **Verified** | 82/82 unit tests, 54/54 HTTP checks, live server on `dist/` |
+| MongoDB | **Unverified — Blocked (environment)** | compiles clean, 85/85 contract methods present on 8 stores; no `mongod`/Docker in this sandbox, so no query has ever been executed against a server |
+
+Shared semantics are replicated deliberately rather than assumed: `projectId: null` matches global
+rows (`projectId = ? OR projectId IS NULL`), patch `undefined` keeps the existing value, memory revision
+history keeps the last 20 entries, `messages(n)` returns the last N in ascending order, and cascades are
+explicit multi-collection deletes because there are no foreign keys. A failed connection raises one
+actionable `STORAGE_ERROR` and never silently falls back to SQLite.
+
 ### Environment-blocked (not code gaps)
 
 | Capability | Blocker |
@@ -149,3 +166,4 @@ Layers 0–8 are built. See `COMPLETION_MATRIX.md` for the per-feature verdict w
 | Electron window | no display / no Electron binary in this sandbox |
 | Live Playwright browser | Chromium not downloaded (`npx playwright install chromium` on a desktop) |
 | Gemini/Groq calls, vision, embeddings | no API key supplied; `MockProvider` + `StubDriver` cover the code paths |
+| MongoDB happy path | no `mongod` and no Docker in this sandbox — connect, indexes, reads, writes and cascades are unexecuted |

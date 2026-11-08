@@ -107,13 +107,13 @@ export class TerminalManager {
    * Validation stage shared by run/start: returns the resolved cwd and whether a
    * human approval is required. Never executes anything.
    */
-  validate(input: { projectId: string; command: string; cwd?: string }): {
+  async validate(input: { projectId: string; command: string; cwd?: string }): Promise<{
     absCwd: string;
     needsApproval: boolean;
     reason: string;
     risk: 'low' | 'medium' | 'high';
-  } {
-    const project = this.db.projects.get(input.projectId);
+  }> {
+    const project = await this.db.projects.get(input.projectId);
     if (!project) throw new NexusError('NOT_FOUND', `Project not found: ${input.projectId}`);
     const command = input.command.trim();
     assertCommandAllowed(command);
@@ -137,7 +137,7 @@ export class TerminalManager {
 
   /** One-shot command with captured output. */
   async run(input: RunCommandInput): Promise<CommandResult | ApprovalRequiredResult> {
-    const checked = this.validate(input);
+    const checked = await this.validate(input);
     if (checked.needsApproval && !input.approved) {
       return {
         requiresApproval: true,
@@ -227,8 +227,8 @@ export class TerminalManager {
   }
 
   /** Long-running process (dev server, watcher) with streamed output. */
-  start(input: RunCommandInput & { label?: string }): ManagedProcessInfo | ApprovalRequiredResult {
-    const checked = this.validate(input);
+  async start(input: RunCommandInput & { label?: string }): Promise<ManagedProcessInfo | ApprovalRequiredResult> {
+    const checked = await this.validate(input);
     if (checked.needsApproval && !input.approved) {
       return { requiresApproval: true, command: input.command, reason: checked.reason, risk: checked.risk };
     }
@@ -264,7 +264,7 @@ export class TerminalManager {
     this.events?.emit('process.started', `Started: ${input.command}`, { processId, pid: child.pid }, {
       projectId: input.projectId,
     });
-    this.db.observability.addActivity({
+    await this.db.observability.addActivity({
       kind: 'process',
       level: 'info',
       title: `Process started`,
@@ -297,15 +297,16 @@ export class TerminalManager {
         processId,
         code,
       }, { projectId: input.projectId });
+      void (async () => {
       try {
         if (entry.status === 'failed') {
-          this.db.observability.addNotification({
+          await this.db.observability.addNotification({
             title: 'Process crashed',
             body: `${input.command} exited with code ${code}`,
             level: 'error',
           });
         }
-        this.db.observability.addActivity({
+        await this.db.observability.addActivity({
         kind: 'process',
         level: entry.status === 'failed' ? 'error' : 'info',
         title: `Process ${entry.status}`,
@@ -319,11 +320,12 @@ export class TerminalManager {
         // The store may be gone during shutdown; a process exit must not throw.
         if (!this.disposed) console.error('[nexus][terminal] exit handler error:', err);
       }
+      })();
     });
 
     // Watchdog: never let an orphaned dev server live forever.
     entry.timeout = setTimeout(() => {
-      if (entry.status === 'running') this.stop(processId);
+      if (entry.status === 'running') void this.stop(processId);
     }, 60 * 60 * 1000);
 
     return this.publicInfo(entry);
@@ -363,17 +365,17 @@ export class TerminalManager {
     return this.publicInfo(entry);
   }
 
-  restart(processId: string): ManagedProcessInfo {
+  async restart(processId: string): Promise<ManagedProcessInfo> {
     const entry = this.processes.get(processId);
     if (!entry) throw new NexusError('NOT_FOUND', `Process not found: ${processId}`);
     const { command, projectId, cwd } = entry;
-    this.stop(processId);
-    const restarted = this.start({ projectId, command, cwd, approved: true });
+    await this.stop(processId);
+    const restarted = await this.start({ projectId, command, cwd, approved: true });
     if ('requiresApproval' in restarted) {
       throw new NexusError('APPROVAL_REQUIRED', 'Restart requires approval');
     }
     this.processes.get(restarted.id)!.restarts = entry.restarts + 1;
-    return this.get(restarted.id);
+    return await this.get(restarted.id);
   }
 
   historyEntries(limit = 50) {

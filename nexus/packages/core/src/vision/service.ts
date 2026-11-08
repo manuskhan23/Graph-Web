@@ -10,7 +10,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { NexusError } from '../errors.js';
 import { config } from '../config.js';
 import type { ModelRouter } from '../providers/router.js';
-import type { ObservabilityRepository } from '../storage/repositories/observability.js';
+import type { ObservabilityStore } from '../storage/contracts.js';
 
 export interface VisionInput {
   imageBase64?: string;
@@ -33,7 +33,7 @@ const SUPPORTED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/
 export class VisionService {
   constructor(
     private readonly router: ModelRouter,
-    private readonly observability: ObservabilityRepository,
+    private readonly observability: ObservabilityStore,
   ) {}
 
   async analyze(input: VisionInput): Promise<VisionResult> {
@@ -86,7 +86,7 @@ export class VisionService {
       { capability: 'vision', complexity: 'moderate', purpose: 'vision', containsProjectData: Boolean(input.projectId) },
     );
 
-    this.observability.addActivity({
+    await this.observability.addActivity({
       kind: 'provider',
       level: 'info',
       title: 'Vision analysis',

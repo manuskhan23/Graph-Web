@@ -368,7 +368,7 @@ export function SettingsPage() {
 }
 
 const defaultSettings: AppSettings = {
-  ai: { defaultProvider: 'gemini', geminiModel: 'gemini-2.5-pro', groqModel: 'openai/gpt-oss-120b', temperature: 0.4, maxOutputTokens: 4096, allowCrossProviderFallback: true },
+  ai: { defaultProvider: 'gemini', geminiModel: 'gemini-3.8-flash', groqModel: 'openai/gpt-oss-120b', temperature: 0.4, maxOutputTokens: 4096, allowCrossProviderFallback: true },
   agent: { maxToolCalls: 24, maxDurationMs: 300000, maxRetriesPerStep: 2, maxContextTokens: 48000, maxConcurrentTasks: 2, requireApprovalFor: { medium: true, high: true } },
   app: {
     theme: 'monochrome',

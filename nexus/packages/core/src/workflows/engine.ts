@@ -37,8 +37,8 @@ export class WorkflowEngine {
 
   constructor(private readonly deps: WorkflowEngineDeps) {}
 
-  list() {
-    return this.deps.db.workflows.list();
+  async list() {
+    return await this.deps.db.workflows.list();
   }
 
   pause(executionId: string): void {
@@ -55,25 +55,25 @@ export class WorkflowEngine {
 
   /** Start a new execution. */
   async run(options: WorkflowRunOptions): Promise<WorkflowExecution> {
-    const workflow = this.deps.db.workflows.get(options.workflowId);
+    const workflow = await this.deps.db.workflows.get(options.workflowId);
     if (!workflow) throw new NexusError('NOT_FOUND', `Workflow not found: ${options.workflowId}`);
     if (workflow.blocks.length === 0) throw new NexusError('VALIDATION_FAILED', 'Workflow has no blocks');
-    const execution = this.deps.db.workflows.createExecution(workflow);
+    const execution = await this.deps.db.workflows.createExecution(workflow);
     return this.execute(execution, workflow, options);
   }
 
   /** Resume a paused or interrupted execution from its persisted cursor. */
   async resume(executionId: string): Promise<WorkflowExecution> {
-    const execution = this.deps.db.workflows.getExecution(executionId);
+    const execution = await this.deps.db.workflows.getExecution(executionId);
     if (!execution) throw new NexusError('NOT_FOUND', `Execution not found: ${executionId}`);
     if (execution.status === 'completed' || execution.status === 'cancelled') {
       throw new NexusError('TASK_STATE_INVALID', `Execution is already ${execution.status}`);
     }
-    const workflow = this.deps.db.workflows.get(execution.workflowId);
+    const workflow = await this.deps.db.workflows.get(execution.workflowId);
     if (!workflow) throw new NexusError('NOT_FOUND', 'Workflow no longer exists');
     this.paused.delete(executionId);
     execution.status = 'running';
-    this.deps.db.workflows.saveExecution(execution);
+    await this.deps.db.workflows.saveExecution(execution);
     return this.execute(execution, workflow, { workflowId: workflow.id, projectId: execution.projectId });
   }
 
@@ -96,8 +96,8 @@ export class WorkflowEngine {
           execution.status = 'failed';
           execution.error = `Workflow exceeded ${maxBlocks} block executions (possible infinite loop)`;
           execution.finishedAt = Date.now();
-          this.deps.db.workflows.saveExecution(execution);
-          this.deps.db.observability.addNotification({
+          await this.deps.db.workflows.saveExecution(execution);
+          await this.deps.db.observability.addNotification({
             title: 'Workflow stopped',
             body: execution.error,
             level: 'error',
@@ -107,13 +107,13 @@ export class WorkflowEngine {
         if (this.cancelled.has(execution.id)) {
           execution.status = 'cancelled';
           execution.finishedAt = Date.now();
-          this.deps.db.workflows.saveExecution(execution);
+          await this.deps.db.workflows.saveExecution(execution);
           return execution;
         }
         if (this.paused.has(execution.id)) {
           execution.status = 'paused';
           execution.cursor = cursor;
-          this.deps.db.workflows.saveExecution(execution);
+          await this.deps.db.workflows.saveExecution(execution);
           return execution;
         }
 
@@ -144,14 +144,14 @@ export class WorkflowEngine {
           status: result.ok ? 'success' : 'failed',
           detail: result.detail.slice(0, 2000),
         });
-        this.deps.db.workflows.saveExecution(execution);
+        await this.deps.db.workflows.saveExecution(execution);
 
         if (!result.ok) {
           execution.status = 'failed';
           execution.error = result.detail;
           execution.finishedAt = Date.now();
-          this.deps.db.workflows.saveExecution(execution);
-          this.deps.db.observability.addNotification({
+          await this.deps.db.workflows.saveExecution(execution);
+          await this.deps.db.observability.addNotification({
             title: 'Workflow failed',
             body: `${workflow.name} — ${block.label}: ${result.detail.slice(0, 200)}`,
             level: 'error',
@@ -172,8 +172,8 @@ export class WorkflowEngine {
       execution.status = 'completed';
       execution.finishedAt = Date.now();
       execution.cursor = null;
-      this.deps.db.workflows.saveExecution(execution);
-      this.deps.db.observability.addNotification({
+      await this.deps.db.workflows.saveExecution(execution);
+      await this.deps.db.observability.addNotification({
         title: 'Workflow completed',
         body: `${workflow.name} finished (${execution.log.length} blocks)`,
         level: 'success',

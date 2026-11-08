@@ -11,7 +11,7 @@
  */
 import { toNexusError, NexusError } from '../errors.js';
 import type { RiskLevel, ToolDescriptor } from '../types.js';
-import type { ObservabilityRepository } from '../storage/repositories/observability.js';
+import type { ObservabilityStore } from '../storage/contracts.js';
 import type { EventBus } from '../events/bus.js';
 import type { ApprovalGate } from '../agents/approvals.js';
 import type { ToolContext, ToolDefinition, ToolExecutionOutcome } from './types.js';
@@ -21,7 +21,7 @@ export class ToolRegistry {
   private tools = new Map<string, ToolDefinition<unknown, unknown>>();
 
   constructor(
-    private readonly observability: ObservabilityRepository,
+    private readonly observability: ObservabilityStore,
     private readonly approvals: ApprovalGate,
     private readonly events?: EventBus,
   ) {}
@@ -81,7 +81,7 @@ export class ToolRegistry {
         denied: true,
         error: { code: 'TOOL_NOT_FOUND', message: `Unknown tool: ${toolId}` },
       };
-      this.recordExecution(executionId, toolId, rawInput, ctx, outcome, 'low');
+      await this.recordExecution(executionId, toolId, rawInput, ctx, outcome, 'low');
       return outcome;
     }
 
@@ -99,8 +99,8 @@ export class ToolRegistry {
         denied: true,
         error: { code: 'PERMISSION_DENIED', message: `Role ${ctx.agentRole} not allowed to call ${toolId}` },
       };
-      this.recordExecution(executionId, toolId, rawInput, ctx, outcome, descriptor.risk);
-      this.auditDenied(ctx, toolId, outcome.summary);
+      await this.recordExecution(executionId, toolId, rawInput, ctx, outcome, descriptor.risk);
+      void this.auditDenied(ctx, toolId, outcome.summary);
       return outcome;
     }
 
@@ -118,7 +118,7 @@ export class ToolRegistry {
         denied: false,
         error: { code: 'VALIDATION_FAILED', message: details },
       };
-      this.recordExecution(executionId, toolId, rawInput, ctx, outcome, descriptor.risk);
+      await this.recordExecution(executionId, toolId, rawInput, ctx, outcome, descriptor.risk);
       return outcome;
     }
 
@@ -150,7 +150,7 @@ export class ToolRegistry {
           denied: true,
           error: { code: 'APPROVAL_REJECTED', message: 'Human rejected the action' },
         };
-        this.recordExecution(executionId, toolId, rawInput, ctx, outcome, risk);
+        await this.recordExecution(executionId, toolId, rawInput, ctx, outcome, risk);
         return outcome;
       }
     }
@@ -194,14 +194,14 @@ export class ToolRegistry {
       };
     }
 
-    this.recordExecution(executionId, toolId, rawInput, ctx, outcome, risk);
+    await this.recordExecution(executionId, toolId, rawInput, ctx, outcome, risk);
     this.events?.emit(
       outcome.ok ? 'tool.completed' : 'tool.failed',
       `${descriptor.name}: ${outcome.ok ? 'ok' : 'failed'}`,
       { toolId, durationMs: outcome.durationMs, summary: outcome.summary },
       { taskId: ctx.taskId, projectId: ctx.projectId },
     );
-    this.observability.addActivity({
+    await this.observability.addActivity({
       kind: 'tool',
       level: outcome.ok ? 'info' : outcome.denied ? 'warn' : 'error',
       title: `${descriptor.name}`,
@@ -223,16 +223,16 @@ export class ToolRegistry {
     }));
   }
 
-  private recordExecution(
+  private async recordExecution(
     executionId: string,
     toolId: string,
     input: unknown,
     ctx: { projectId: string | null; taskId: string | null },
     outcome: ToolExecutionOutcome,
     risk: RiskLevel,
-  ): void {
+  ): Promise<void> {
     try {
-      this.observability.addToolExecution({
+      await this.observability.addToolExecution({
         taskId: ctx.taskId,
         projectId: ctx.projectId,
         toolId,
@@ -243,7 +243,7 @@ export class ToolRegistry {
         durationMs: outcome.durationMs,
         error: outcome.error ? `[${outcome.error.code}] ${outcome.error.message}` : null,
       });
-      this.observability.audit({
+      await this.observability.audit({
         actor: 'agent',
         action: 'tool.execute',
         subject: toolId,
@@ -256,9 +256,9 @@ export class ToolRegistry {
     }
   }
 
-  private auditDenied(ctx: { taskId: string | null; agentRole: string }, toolId: string, reason: string): void {
+  private async auditDenied(ctx: { taskId: string | null; agentRole: string }, toolId: string, reason: string): Promise<void> {
     try {
-      this.observability.audit({
+      await this.observability.audit({
         actor: ctx.agentRole,
         action: 'tool.execute',
         subject: toolId,

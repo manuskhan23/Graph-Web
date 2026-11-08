@@ -263,7 +263,7 @@ export interface ProviderModelInfo {
 }
 
 export interface ProviderUsageRecord {
-  id: number;
+  id: string;
   provider: ProviderId;
   modelId: string;
   purpose: string;
@@ -504,6 +504,29 @@ export interface AgentRunResult {
 
 export interface ApiErrorBody {
   error: { code: string; message: string; details?: unknown; retryable: boolean };
+}
+
+/* ------------------------------------------------- conversations & messages */
+
+export interface Conversation {
+  id: string;
+  projectId: string | null;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  content: string;
+  provider: string | null;
+  model: string | null;
+  toolCalls: unknown[];
+  attachments: { name: string; mimeType: string }[];
+  tokens: number | null;
+  createdAt: number;
 }
 
 export interface AgentDescriptor {

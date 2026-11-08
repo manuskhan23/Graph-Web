@@ -65,7 +65,7 @@ export function terminalRoutes(app: NexusApp): Router {
         z.object({ projectId: z.string().min(1), command: z.string().min(1).max(2000), cwd: z.string().optional() }),
         req.body,
       );
-      const result = app.terminal.start(body);
+      const result = await app.terminal.start(body);
       if (isApprovalRequired(result)) {
         throw new NexusError('APPROVAL_REQUIRED', result.reason, { httpStatus: 428 });
       }
@@ -79,7 +79,7 @@ export function terminalRoutes(app: NexusApp): Router {
     '/processes/:processId',
     asyncRoute(async (req, res) => {
       const processId = requireParam(req, 'processId');
-      res.json({ process: app.terminal.get(processId), output: app.terminal.output(processId) });
+      res.json({ process: app.terminal.get(processId), output: await app.terminal.output(processId) });
     }),
   );
 
@@ -90,7 +90,7 @@ export function terminalRoutes(app: NexusApp): Router {
 
   router.post(
     '/processes/:processId/restart',
-    asyncRoute(async (req, res) => res.json({ process: app.terminal.restart(requireParam(req, 'processId')) })),
+    asyncRoute(async (req, res) => res.json({ process: await app.terminal.restart(requireParam(req, 'processId')) })),
   );
 
   router.get('/history', asyncRoute(async (_req, res) => res.json({ history: app.terminal.historyEntries(50) })));
@@ -129,7 +129,7 @@ export function editorRoutes(app: NexusApp): Router {
         }),
         req.body,
       );
-      res.json(app.editor.stage(body.projectId, body.operations as never[], body.label));
+      res.json(await app.editor.stage(body.projectId, body.operations as never[], body.label));
     }),
   );
 
@@ -150,7 +150,7 @@ export function editorRoutes(app: NexusApp): Router {
       if (!decision.approved) {
         throw new NexusError('APPROVAL_REJECTED', 'The change was rejected', { httpStatus: 403 });
       }
-      res.json(app.editor.apply(body.operationId, { approvedBy: decision.by }));
+      res.json(await app.editor.apply(body.operationId, { approvedBy: decision.by }));
     }),
   );
 
@@ -184,7 +184,7 @@ export function snapshotRoutes(app: NexusApp): Router {
     asyncRoute(async (req, res) => {
       const projectId = String(req.query.projectId ?? '');
       if (!projectId) throw new NexusError('VALIDATION_FAILED', 'projectId query param is required');
-      res.json({ snapshots: app.snapshots.list(projectId) });
+      res.json({ snapshots: await app.snapshots.list(projectId) });
     }),
   );
 
@@ -196,15 +196,15 @@ export function snapshotRoutes(app: NexusApp): Router {
         req.body,
       );
       const id = body.relPaths
-        ? app.snapshots.capture({ projectId: body.projectId, relPaths: body.relPaths, operationId: `manual_${Date.now()}`, label: body.label, kind: 'manual' })
-        : app.snapshots.captureProject(body.projectId, body.label);
+        ? await app.snapshots.capture({ projectId: body.projectId, relPaths: body.relPaths, operationId: `manual_${Date.now()}`, label: body.label, kind: 'manual' })
+        : await app.snapshots.captureProject(body.projectId, body.label);
       res.status(201).json({ snapshotId: id });
     }),
   );
 
   router.get(
     '/:snapshotId',
-    asyncRoute(async (req, res) => res.json(app.snapshots.detail(requireParam(req, 'snapshotId')))),
+    asyncRoute(async (req, res) => res.json(await app.snapshots.detail(requireParam(req, 'snapshotId')))),
   );
 
   router.get(
@@ -212,7 +212,7 @@ export function snapshotRoutes(app: NexusApp): Router {
     asyncRoute(async (req, res) => {
       const relPath = String(req.query.path ?? '');
       if (!relPath) throw new NexusError('VALIDATION_FAILED', 'path query param is required');
-      res.json(app.snapshots.diffWithCurrent(requireParam(req, 'snapshotId'), relPath));
+      res.json(await app.snapshots.diffWithCurrent(requireParam(req, 'snapshotId'), relPath));
     }),
   );
 
@@ -221,7 +221,7 @@ export function snapshotRoutes(app: NexusApp): Router {
     asyncRoute(async (req, res) => {
       const snapshotId = requireParam(req, 'snapshotId');
       const body = parseBody(z.object({ relPaths: z.array(z.string()).optional() }), req.body);
-      const detail = app.snapshots.detail(snapshotId);
+      const detail = await app.snapshots.detail(snapshotId);
       const decision = await app.approvals.request({
         taskId: null,
         kind: 'tool',
@@ -231,7 +231,7 @@ export function snapshotRoutes(app: NexusApp): Router {
         payload: { snapshotId },
       });
       if (!decision.approved) throw new NexusError('APPROVAL_REJECTED', 'Restore was not approved', { httpStatus: 403 });
-      res.json(app.snapshots.restore(snapshotId, body.relPaths));
+      res.json(await app.snapshots.restore(snapshotId, body.relPaths));
     }),
   );
 
@@ -287,24 +287,24 @@ export function memoryRoutes(app: NexusApp): Router {
     asyncRoute(async (req, res) => {
       const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
       const category = typeof req.query.category === 'string' ? (req.query.category as never) : undefined;
-      res.json({ memories: app.memory.list({ projectId, category }), stats: app.memory.stats() });
+      res.json({ memories: await app.memory.list({ projectId, category }), stats: await app.memory.stats() });
     }),
   );
 
   router.post(
     '/',
-    asyncRoute(async (req, res) => res.status(201).json({ memory: app.memory.create(req.body) })),
+    asyncRoute(async (req, res) => res.status(201).json({ memory: await app.memory.create(req.body) })),
   );
 
   router.patch(
     '/:memoryId',
-    asyncRoute(async (req, res) => res.json({ memory: app.memory.update(requireParam(req, 'memoryId'), req.body) })),
+    asyncRoute(async (req, res) => res.json({ memory: await app.memory.update(requireParam(req, 'memoryId'), req.body) })),
   );
 
   router.delete(
     '/:memoryId',
     asyncRoute(async (req, res) => {
-      app.memory.remove(requireParam(req, 'memoryId'));
+      await app.memory.remove(requireParam(req, 'memoryId'));
       res.json({ removed: true });
     }),
   );
@@ -313,7 +313,7 @@ export function memoryRoutes(app: NexusApp): Router {
     '/export',
     asyncRoute(async (req, res) => {
       const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : null;
-      res.type('application/json').send(app.memory.export(projectId));
+      res.type('application/json').send(await app.memory.export(projectId));
     }),
   );
 
@@ -321,7 +321,7 @@ export function memoryRoutes(app: NexusApp): Router {
     '/import',
     asyncRoute(async (req, res) => {
       const body = parseBody(z.object({ json: z.string().min(2), projectId: z.string().nullable().optional() }), req.body);
-      res.json(app.memory.import(body.json, body.projectId ?? null));
+      res.json(await app.memory.import(body.json, body.projectId ?? null));
     }),
   );
 
@@ -342,7 +342,7 @@ export function workflowRoutes(app: NexusApp): Router {
     onFalse: z.string().nullable(),
   });
 
-  router.get('/', asyncRoute(async (_req, res) => res.json({ workflows: app.workflows.list() })));
+  router.get('/', asyncRoute(async (_req, res) => res.json({ workflows: await app.workflows.list() })));
 
   router.get(
     '/templates',
@@ -362,16 +362,16 @@ export function workflowRoutes(app: NexusApp): Router {
         }),
         req.body,
       );
-      res.status(201).json({ workflow: app.db.workflows.create(body as never) });
+      res.status(201).json({ workflow: await app.db.workflows.create(body as never) });
     }),
   );
 
   router.get(
     '/:workflowId',
     asyncRoute(async (req, res) => {
-      const workflow = app.db.workflows.get(requireParam(req, 'workflowId'));
+      const workflow = await app.db.workflows.get(requireParam(req, 'workflowId'));
       if (!workflow) throw new NexusError('NOT_FOUND', 'Workflow not found');
-      res.json({ workflow, executions: app.db.workflows.executions(workflow.id, 20) });
+      res.json({ workflow, executions: await app.db.workflows.executions(workflow.id, 20) });
     }),
   );
 
@@ -387,7 +387,7 @@ export function workflowRoutes(app: NexusApp): Router {
         }),
         req.body,
       );
-      const updated = app.db.workflows.update(requireParam(req, 'workflowId'), body as never);
+      const updated = await app.db.workflows.update(requireParam(req, 'workflowId'), body as never);
       if (!updated) throw new NexusError('NOT_FOUND', 'Workflow not found');
       res.json({ workflow: updated });
     }),
@@ -395,7 +395,7 @@ export function workflowRoutes(app: NexusApp): Router {
 
   router.delete(
     '/:workflowId',
-    asyncRoute(async (req, res) => res.json({ removed: app.db.workflows.remove(requireParam(req, 'workflowId')) })),
+    asyncRoute(async (req, res) => res.json({ removed: await app.db.workflows.remove(requireParam(req, 'workflowId')) })),
   );
 
   router.post(
@@ -537,9 +537,9 @@ export function analyticsRoutes(app: NexusApp): Router {
     '/',
     asyncRoute(async (_req, res) => {
       res.json({
-        analytics: app.db.observability.analytics(),
-        usage: app.db.observability.usage(100),
-        jobs: app.jobs.list().slice(0, 20),
+        analytics: await app.db.observability.analytics(),
+        usage: await app.db.observability.usage(100),
+        jobs: (await app.jobs.list()).slice(0, 20),
       });
     }),
   );
@@ -556,7 +556,7 @@ export function activityRoutes(app: NexusApp): Router {
     asyncRoute(async (req, res) => {
       const limit = Number(req.query.limit ?? 100);
       res.json({
-        activity: app.db.observability.activity({
+        activity: await app.db.observability.activity({
           kind: typeof req.query.kind === 'string' ? req.query.kind : undefined,
           level: typeof req.query.level === 'string' ? req.query.level : undefined,
           projectId: typeof req.query.projectId === 'string' ? req.query.projectId : undefined,
@@ -570,8 +570,8 @@ export function activityRoutes(app: NexusApp): Router {
     '/notifications',
     asyncRoute(async (_req, res) => {
       res.json({
-        notifications: app.db.observability.notifications(50),
-        unread: app.db.observability.unreadNotificationCount(),
+        notifications: await app.db.observability.notifications(50),
+        unread: await app.db.observability.unreadNotificationCount(),
       });
     }),
   );
@@ -580,16 +580,16 @@ export function activityRoutes(app: NexusApp): Router {
     '/notifications/read',
     asyncRoute(async (req, res) => {
       const body = parseBody(z.object({ id: z.string().optional() }), req.body);
-      if (body.id) app.db.observability.markNotificationRead(body.id);
-      else app.db.observability.markAllNotificationsRead();
-      res.json({ unread: app.db.observability.unreadNotificationCount() });
+      if (body.id) await app.db.observability.markNotificationRead(body.id);
+      else await app.db.observability.markAllNotificationsRead();
+      res.json({ unread: await app.db.observability.unreadNotificationCount() });
     }),
   );
 
   router.get(
     '/audit',
     asyncRoute(async (req, res) => {
-      res.json({ audit: app.db.observability.auditEntries(Math.min(Number(req.query.limit ?? 100), 500)) });
+      res.json({ audit: await app.db.observability.auditEntries(Math.min(Number(req.query.limit ?? 100), 500)) });
     }),
   );
 
@@ -606,21 +606,21 @@ export function settingsRoutes(app: NexusApp): Router {
   router.patch(
     '/',
     asyncRoute(async (req, res) => {
-      const settings = app.settings.update(req.body);
+      const settings = await app.settings.update(req.body);
       res.json({ settings, keys: app.settings.response().keys });
     }),
   );
 
   router.post(
     '/reset',
-    asyncRoute(async (_req, res) => res.json({ settings: app.settings.reset() })),
+    asyncRoute(async (_req, res) => res.json({ settings: await app.settings.reset() })),
   );
 
   router.post(
     '/keys',
     asyncRoute(async (req, res) => {
       const body = parseBody(z.object({ provider: z.enum(['gemini', 'groq']), key: z.string().min(8).max(500) }), req.body);
-      res.json(app.settings.setApiKey(body.provider, body.key));
+      res.json(await app.settings.setApiKey(body.provider, body.key));
     }),
   );
 
@@ -629,7 +629,7 @@ export function settingsRoutes(app: NexusApp): Router {
     asyncRoute(async (req, res) => {
       const provider = requireParam(req, 'provider');
       if (provider !== 'gemini' && provider !== 'groq') throw new NexusError('VALIDATION_FAILED', 'Unknown provider');
-      res.json(app.settings.clearApiKey(provider));
+      res.json(await app.settings.clearApiKey(provider));
     }),
   );
 
@@ -653,12 +653,24 @@ export function metaRoutes(app: NexusApp): Router {
     }),
   );
 
+  /** Model registry on its own route; `/providers` returns the same table. */
+  router.get(
+    '/models',
+    asyncRoute(async (_req, res) => res.json({ models: ALL_MODELS })),
+  );
+
   router.get(
     '/health',
     asyncRoute(async (_req, res) => {
       res.json({
         status: 'ok',
-        database: { version: app.db.version },
+        // The backend is reported, never inferred: SQLite and MongoDB both say so.
+        database: {
+          backend: app.db.backend,
+          location: app.db.location,
+          version: app.db.version,
+          serverVersion: app.db.serverVersion,
+        },
         providers: app.router.configuredProviders(),
         browser: { driver: app.browser.driverKind(), ...(await app.browser.availability()) },
         version: '2.0.0',
@@ -673,18 +685,18 @@ export function metaRoutes(app: NexusApp): Router {
 
 export function jobRoutes(app: NexusApp): Router {
   const router = Router();
-  router.get('/', asyncRoute(async (_req, res) => res.json({ jobs: app.jobs.list() })));
+  router.get('/', asyncRoute(async (_req, res) => res.json({ jobs: await app.jobs.list() })));
   router.get(
     '/:jobId',
     asyncRoute(async (req, res) => {
-      const job = app.jobs.get(requireParam(req, 'jobId'));
+      const job = await app.jobs.get(requireParam(req, 'jobId'));
       if (!job) throw new NexusError('NOT_FOUND', 'Job not found');
       res.json({ job });
     }),
   );
   router.post(
     '/:jobId/cancel',
-    asyncRoute(async (req, res) => res.json({ job: app.jobs.cancel(requireParam(req, 'jobId')) })),
+    asyncRoute(async (req, res) => res.json({ job: await app.jobs.cancel(requireParam(req, 'jobId')) })),
   );
   return router;
 }

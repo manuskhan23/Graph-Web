@@ -2,7 +2,7 @@
   "name": "nexus-ai",
   "version": "2.0.0",
   "private": true,
-  "description": "NEXUS AI \u2014 autonomous AI desktop engineering agent",
+  "description": "NEXUS AI — autonomous AI desktop engineering agent",
   "type": "module",
   "engines": {
     "node": ">=22.5.0"
@@ -23,6 +23,7 @@
     "chokidar": "^4.0.3",
     "diff": "^8.0.2",
     "express": "^4.21.2",
+    "mongodb": "^7.8.0",
     "playwright": "^1.55.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

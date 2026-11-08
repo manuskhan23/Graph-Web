@@ -1,7 +1,8 @@
 import type { WorkflowBlock, WorkflowDefinition, WorkflowExecution } from '../../types.js';
 import { id, now, parseJson, type SqlDriver, type SqlRow } from '../driver.js';
+import type { WorkflowStore } from '../contracts.js';
 
-export class WorkflowsRepository {
+export class SqliteWorkflowStore implements WorkflowStore {
   constructor(private readonly db: SqlDriver) {}
 
   private mapWorkflow(row: SqlRow): WorkflowDefinition {
@@ -32,23 +33,23 @@ export class WorkflowsRepository {
     };
   }
 
-  list(): WorkflowDefinition[] {
+  async list(): Promise<WorkflowDefinition[]> {
     return this.db.all('SELECT * FROM workflows ORDER BY updated_at DESC').map((r) => this.mapWorkflow(r));
   }
 
-  get(workflowId: string): WorkflowDefinition | null {
+  async get(workflowId: string): Promise<WorkflowDefinition | null> {
     const row = this.db.get('SELECT * FROM workflows WHERE id = ?', [workflowId]);
     return row ? this.mapWorkflow(row) : null;
   }
 
-  create(input: {
+  async create(input: {
     name: string;
     description?: string;
     projectId?: string | null;
     blocks: WorkflowBlock[];
     entry?: string | null;
     isTemplate?: boolean;
-  }): WorkflowDefinition {
+  }): Promise<WorkflowDefinition> {
     const workflowId = id('wf');
     const ts = now();
     this.db.run(
@@ -66,14 +67,14 @@ export class WorkflowsRepository {
         ts,
       ],
     );
-    return this.get(workflowId)!;
+    return (await this.get(workflowId))!;
   }
 
-  update(
+  async update(
     workflowId: string,
     patch: { name?: string; description?: string; blocks?: WorkflowBlock[]; entry?: string | null },
-  ): WorkflowDefinition | null {
-    const current = this.get(workflowId);
+  ): Promise<WorkflowDefinition | null> {
+    const current = await this.get(workflowId);
     if (!current) return null;
     this.db.run(
       'UPDATE workflows SET name = ?, description = ?, blocks = ?, entry = ?, updated_at = ? WHERE id = ?',
@@ -86,36 +87,36 @@ export class WorkflowsRepository {
         workflowId,
       ],
     );
-    return this.get(workflowId);
+    return await this.get(workflowId);
   }
 
-  remove(workflowId: string): boolean {
+  async remove(workflowId: string): Promise<boolean> {
     return this.db.run('DELETE FROM workflows WHERE id = ?', [workflowId]).changes > 0;
   }
 
-  createExecution(workflow: WorkflowDefinition): WorkflowExecution {
+  async createExecution(workflow: WorkflowDefinition): Promise<WorkflowExecution> {
     const executionId = id('wfx');
     this.db.run(
       `INSERT INTO workflow_executions (id, workflow_id, project_id, status, cursor, log, started_at)
        VALUES (?, ?, ?, 'running', ?, '[]', ?)`,
       [executionId, workflow.id, workflow.projectId, workflow.entry, now()],
     );
-    return this.getExecution(executionId)!;
+    return (await this.getExecution(executionId))!;
   }
 
-  getExecution(executionId: string): WorkflowExecution | null {
+  async getExecution(executionId: string): Promise<WorkflowExecution | null> {
     const row = this.db.get('SELECT * FROM workflow_executions WHERE id = ?', [executionId]);
     return row ? this.mapExecution(row) : null;
   }
 
-  saveExecution(exec: WorkflowExecution): void {
+  async saveExecution(exec: WorkflowExecution): Promise<void> {
     this.db.run(
       'UPDATE workflow_executions SET status = ?, cursor = ?, log = ?, finished_at = ?, error = ? WHERE id = ?',
       [exec.status, exec.cursor, JSON.stringify(exec.log), exec.finishedAt, exec.error, exec.id],
     );
   }
 
-  executions(workflowId: string, limit = 30): WorkflowExecution[] {
+  async executions(workflowId: string, limit = 30): Promise<WorkflowExecution[]> {
     return this.db
       .all('SELECT * FROM workflow_executions WHERE workflow_id = ? ORDER BY started_at DESC LIMIT ?', [
         workflowId,
@@ -124,7 +125,7 @@ export class WorkflowsRepository {
       .map((r) => this.mapExecution(r));
   }
 
-  allExecutions(limit = 100): WorkflowExecution[] {
+  async allExecutions(limit = 100): Promise<WorkflowExecution[]> {
     return this.db
       .all('SELECT * FROM workflow_executions ORDER BY started_at DESC LIMIT ?', [limit])
       .map((r) => this.mapExecution(r));

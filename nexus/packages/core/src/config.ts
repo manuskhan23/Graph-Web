@@ -11,6 +11,8 @@ export interface NexusConfig {
   /** Where SQLite + artifacts live (snapshots, screenshots, indexes). */
   dataDir: string;
   dbPath: string;
+  /** When set, MongoDB is used instead of SQLite. */
+  mongodbUri: string | null;
   artifactDir: string;
   logDir: string;
   /** Exact origins allowed to call the API (no wildcards). */
@@ -50,6 +52,10 @@ export const config: NexusConfig = {
   dataDir,
   get dbPath() {
     return join(dataDir, 'nexus.db');
+  },
+  get mongodbUri() {
+    const uri = process.env.MONGODB_URI?.trim();
+    return uri && uri.length > 0 ? uri : null;
   },
   get artifactDir() {
     return join(dataDir, 'artifacts');

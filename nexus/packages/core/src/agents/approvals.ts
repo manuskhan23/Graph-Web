@@ -8,8 +8,8 @@
  */
 import { NexusError } from '../errors.js';
 import type { ApprovalRequest, RiskLevel } from '../types.js';
-import type { ObservabilityRepository } from '../storage/repositories/observability.js';
-import type { TasksRepository } from '../storage/repositories/tasks.js';
+import type { ObservabilityStore } from '../storage/contracts.js';
+import type { TaskStore } from '../storage/contracts.js';
 import type { EventBus } from '../events/bus.js';
 import type { SettingsService } from '../settings/service.js';
 
@@ -22,8 +22,8 @@ export class ApprovalGate {
   private pending = new Map<string, Pending>();
 
   constructor(
-    private readonly observability: ObservabilityRepository,
-    private readonly tasks: TasksRepository,
+    private readonly observability: ObservabilityStore,
+    private readonly tasks: TaskStore,
     private readonly settings: SettingsService,
     private readonly events?: EventBus,
   ) {}
@@ -48,7 +48,7 @@ export class ApprovalGate {
     autoApprove?: boolean;
   }): Promise<{ approved: boolean; by: string; id: string }> {
     if (input.autoApprove) {
-      const record = this.observability.createApproval({
+      const record = await this.observability.createApproval({
         taskId: input.taskId,
         kind: input.kind,
         title: input.title,
@@ -56,11 +56,11 @@ export class ApprovalGate {
         risk: input.risk,
         payload: input.payload,
       });
-      this.observability.resolveApproval(record.id, 'approved', 'policy:auto');
+      await this.observability.resolveApproval(record.id, 'approved', 'policy:auto');
       return { approved: true, by: 'policy:auto', id: record.id };
     }
 
-    const record = this.observability.createApproval({
+    const record = await this.observability.createApproval({
       taskId: input.taskId,
       kind: input.kind,
       title: input.title,
@@ -70,12 +70,12 @@ export class ApprovalGate {
     });
 
     if (input.taskId) {
-      this.tasks.update(input.taskId, { status: 'awaiting_approval' });
+      await this.tasks.update(input.taskId, { status: 'awaiting_approval' });
     }
     this.events?.emit('approval.required', input.title, { approvalId: record.id, risk: input.risk, detail: input.detail }, {
       taskId: input.taskId,
     });
-    this.observability.addNotification({
+    await this.observability.addNotification({
       title: 'Approval required',
       body: input.title,
       level: 'warn',
@@ -85,7 +85,7 @@ export class ApprovalGate {
     const decision = await new Promise<{ approved: boolean; by: string }>((resolve) => {
       const timer = setTimeout(() => {
         this.pending.delete(record.id);
-        this.observability.resolveApproval(record.id, 'rejected', 'timeout');
+        void this.observability.resolveApproval(record.id, 'rejected', 'timeout');
         resolve({ approved: false, by: 'timeout' });
       }, timeoutMs);
       // NOTE: deliberately not unref'd — a pending human decision is real work
@@ -94,9 +94,9 @@ export class ApprovalGate {
     });
 
     if (input.taskId) {
-      this.tasks.update(input.taskId, { status: decision.approved ? 'running' : 'running' });
+      await this.tasks.update(input.taskId, { status: decision.approved ? 'running' : 'running' });
     }
-    this.observability.audit({
+    await this.observability.audit({
       actor: decision.by,
       action: `approval.${decision.approved ? 'approved' : 'rejected'}`,
       subject: record.id,
@@ -106,13 +106,13 @@ export class ApprovalGate {
     return { ...decision, id: record.id };
   }
 
-  resolve(approvalId: string, approved: boolean, by = 'user'): ApprovalRequest {
-    const record = this.observability.getApproval(approvalId);
+  async resolve(approvalId: string, approved: boolean, by = 'user'): Promise<ApprovalRequest> {
+    const record = await this.observability.getApproval(approvalId);
     if (!record) throw new NexusError('NOT_FOUND', `Approval not found: ${approvalId}`);
     if (record.status !== 'pending') {
       throw new NexusError('CONFLICT', `Approval already ${record.status}`);
     }
-    this.observability.resolveApproval(approvalId, approved ? 'approved' : 'rejected', by);
+    await this.observability.resolveApproval(approvalId, approved ? 'approved' : 'rejected', by);
     const pending = this.pending.get(approvalId);
     if (pending) {
       clearTimeout(pending.timer);
@@ -123,16 +123,16 @@ export class ApprovalGate {
       approvalId,
       approved,
     }, { taskId: record.taskId });
-    return this.observability.getApproval(approvalId)!;
+    return (await this.observability.getApproval(approvalId))!;
   }
 
   /** Deny every pending approval owned by a task (used by cancellation). */
-  denyTask(taskId: string, reason: string): number {
+  async denyTask(taskId: string, reason: string): Promise<number> {
     let denied = 0;
-    for (const record of this.observability.approvals({ status: 'pending' })) {
+    for (const record of (await this.observability.approvals({ status: 'pending' })).filter((r) => r.taskId === taskId)) {
       if (record.taskId !== taskId) continue;
       const pending = this.pending.get(record.id);
-      this.observability.resolveApproval(record.id, 'rejected', reason);
+      await this.observability.resolveApproval(record.id, 'rejected', reason);
       if (pending) {
         clearTimeout(pending.timer);
         this.pending.delete(record.id);
@@ -143,16 +143,16 @@ export class ApprovalGate {
     return denied;
   }
 
-  list(status?: ApprovalRequest['status']): ApprovalRequest[] {
-    return this.observability.approvals(status ? { status } : {});
+  async list(status?: ApprovalRequest['status']): Promise<ApprovalRequest[]> {
+    return await this.observability.approvals(status ? { status } : {});
   }
 
   /** On shutdown, pending approvals become denials so nothing hangs. */
-  dispose(): void {
+  async dispose(): Promise<void> {
     for (const [approvalId, pending] of this.pending) {
       clearTimeout(pending.timer);
       try {
-        this.observability.resolveApproval(approvalId, 'expired', 'shutdown');
+        await this.observability.resolveApproval(approvalId, 'expired', 'shutdown');
       } catch {
         /* database already closed */
       }

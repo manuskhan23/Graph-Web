@@ -10,6 +10,7 @@ import { NexusError, describeError } from '../errors.js';
 import type { Database } from '../storage/db.js';
 import type { EventBus } from '../events/bus.js';
 import { id } from '../storage/driver.js';
+import type { JobRecord } from '../storage/contracts.js';
 
 export type JobState = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
@@ -58,7 +59,7 @@ export class JobManager {
     };
     const controller = new AbortController();
     this.jobs.set(job.id, { job, cancel: () => controller.abort() });
-    this.persist(job);
+    void this.persist(job);
 
     // Fire and forget: the caller gets the id, never the promise.
     void this.execute(job, fn, controller.signal);
@@ -72,14 +73,14 @@ export class JobManager {
   ): Promise<void> {
     job.status = 'running';
     job.message = 'Running';
-    this.persist(job);
+    void this.persist(job);
     try {
       await fn({
         report: (progress, message) => {
           job.progress = Math.max(0, Math.min(1, progress));
           job.message = message;
           job.updatedAt = Date.now();
-          this.persist(job);
+          void this.persist(job);
           this.events?.emit('job.updated', message, { jobId: job.id, progress: job.progress, kind: job.kind });
         },
         signal,
@@ -95,14 +96,14 @@ export class JobManager {
     } catch (err) {
       job.status = signal.aborted ? 'cancelled' : 'failed';
       job.message = describeError(err);
-      this.db.observability.addNotification({
+      await this.db.observability.addNotification({
         title: `Job failed: ${job.kind}`,
         body: job.message.slice(0, 300),
         level: 'error',
       });
     } finally {
       job.updatedAt = Date.now();
-      this.persist(job);
+      void this.persist(job);
       this.events?.emit('job.updated', `${job.kind}: ${job.status}`, {
         jobId: job.id,
         status: job.status,
@@ -114,36 +115,36 @@ export class JobManager {
     }
   }
 
-  get(jobId: string): Job | null {
+  async get(jobId: string): Promise<Job | null> {
     const handle = this.jobs.get(jobId);
     if (handle) return handle.job;
-    const rows = this.db.observability.jobs(200);
+    const rows = await (await this.db.observability.jobs(200));
     const row = rows.find((r) => String(r.id) === jobId);
     return row
       ? {
           id: String(row.id),
           kind: String(row.kind),
-          referenceId: row.reference_id === null ? null : String(row.reference_id),
+          referenceId: row.referenceId === null ? null : String(row.referenceId),
           status: String(row.status) as JobState,
           progress: Number(row.progress),
           message: String(row.message),
-          createdAt: Number(row.created_at),
-          updatedAt: Number(row.updated_at),
+          createdAt: Number(row.createdAt),
+          updatedAt: Number(row.updatedAt),
         }
       : null;
   }
 
-  list(): Job[] {
+  async list(): Promise<Job[]> {
     const live = [...this.jobs.values()].map((h) => h.job);
-    const persisted = this.db.observability.jobs(100).map((row) => ({
+    const persisted = (await this.db.observability.jobs(100)).map((row: JobRecord) => ({
       id: String(row.id),
       kind: String(row.kind),
-      referenceId: row.reference_id === null ? null : String(row.reference_id),
+      referenceId: row.referenceId === null ? null : String(row.referenceId),
       status: String(row.status) as JobState,
       progress: Number(row.progress),
       message: String(row.message),
-      createdAt: Number(row.created_at),
-      updatedAt: Number(row.updated_at),
+      createdAt: Number(row.createdAt),
+      updatedAt: Number(row.updatedAt),
     }));
     const byId = new Map<string, Job>();
     for (const job of persisted) byId.set(job.id, job);
@@ -151,7 +152,7 @@ export class JobManager {
     return [...byId.values()].sort((a, b) => b.createdAt - a.createdAt);
   }
 
-  cancel(jobId: string): Job {
+  async cancel(jobId: string): Promise<Job> {
     const handle = this.jobs.get(jobId);
     if (!handle) throw new NexusError('NOT_FOUND', `Job not found: ${jobId}`);
     handle.cancel();
@@ -159,9 +160,9 @@ export class JobManager {
     return handle.job;
   }
 
-  private persist(job: Job): void {
+  private async persist(job: Job): Promise<void> {
     try {
-      this.db.observability.upsertJob({
+      await this.db.observability.upsertJob({
         id: job.id,
         kind: job.kind,
         referenceId: job.referenceId,

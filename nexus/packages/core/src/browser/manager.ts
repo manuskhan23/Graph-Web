@@ -45,12 +45,12 @@ export class BrowserManager {
   }
 
   async launch(options: { headless?: boolean } = {}): Promise<BrowserSessionInfo> {
-    const settings = this.db.observability.getSetting<{ app?: { browser?: { headless?: boolean } } }>('app.settings', {});
+    const settings = await this.db.observability.getSetting<{ app?: { browser?: { headless?: boolean } } }>('app.settings', {});
     const headless = options.headless ?? settings?.app?.browser?.headless ?? true;
     const { info } = await this.driver.launch({ headless });
     this.sessions.set(info.id, info);
     this.events?.emit('browser.action', `Browser session started (${this.driver.kind})`, { sessionId: info.id, headless });
-    this.db.observability.addActivity({
+    await this.db.observability.addActivity({
       kind: 'browser',
       level: 'info',
       title: 'Browser session started',
@@ -168,7 +168,7 @@ export class BrowserManager {
       }
     } catch (err) {
       const message = err instanceof NexusError ? err.message : (err as Error).message;
-      this.db.observability.addActivity({
+      await this.db.observability.addActivity({
         kind: 'browser',
         level: 'error',
         title: `Browser action failed: ${input.action}`,
@@ -189,7 +189,7 @@ export class BrowserManager {
       action: input.action,
       durationMs: Date.now() - startedAt,
     });
-    this.db.observability.addActivity({
+    await this.db.observability.addActivity({
       kind: 'browser',
       level: 'info',
       title: `Browser ${input.action}`,

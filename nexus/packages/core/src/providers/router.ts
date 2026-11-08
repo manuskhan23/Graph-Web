@@ -8,7 +8,8 @@
  */
 import { NexusError, toNexusError } from '../errors.js';
 import type { ProviderId, ProviderModelInfo, ProviderStatus } from '../types.js';
-import type { ObservabilityRepository } from '../storage/repositories/observability.js';
+import { EMBEDDING_MODEL, VISION_MODEL } from './models.js';
+import type { ObservabilityStore } from '../storage/contracts.js';
 import type { SettingsService } from '../settings/service.js';
 import type { EventBus } from '../events/bus.js';
 import type { AIProvider, CompletionRequest, CompletionResult, ProviderMessage } from './types.js';
@@ -38,7 +39,7 @@ export interface RouteDecision {
 
 export interface RouterDeps {
   settings: SettingsService;
-  observability: ObservabilityRepository;
+  observability: ObservabilityStore;
   /** Secret accessor (never returns a value to the UI). */
   getKey: (provider: ProviderId) => string | null;
   events?: EventBus;
@@ -116,8 +117,8 @@ export class ModelRouter {
     }
 
     const modelFor = (provider: ProviderId): string => {
-      if (capability === 'embeddings') return 'text-embedding-004';
-      if (capability === 'vision') return 'gemini-2.5-flash';
+      if (capability === 'embeddings') return EMBEDDING_MODEL;
+      if (capability === 'vision') return VISION_MODEL;
       return provider === 'gemini' ? geminiModel : groqModel;
     };
 

@@ -65,11 +65,11 @@ const MODEL_PATTERNS: RegExp[] = [
 export class ProjectAnalyzer {
   constructor(private readonly db: Database) {}
 
-  analyze(projectId: string): ProjectAnalysis {
-    const project = this.db.projects.get(projectId);
+  async analyze(projectId: string): Promise<ProjectAnalysis> {
+    const project = await this.db.projects.get(projectId);
     if (!project) throw new NexusError('NOT_FOUND', `Project not found: ${projectId}`);
     const root = project.rootPath;
-    const fileRecords = this.db.projects.files(projectId);
+    const fileRecords = await this.db.projects.files(projectId);
     if (fileRecords.length === 0) {
       throw new NexusError('VALIDATION_FAILED', 'Project has not been indexed yet. Run a scan first.');
     }

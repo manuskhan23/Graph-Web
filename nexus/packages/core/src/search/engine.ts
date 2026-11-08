@@ -12,6 +12,7 @@
 import type { SearchHit, SearchResponse } from '../types.js';
 import type { Database } from '../storage/db.js';
 import type { ModelRouter } from '../providers/router.js';
+import { EMBEDDING_MODEL } from '../providers/models.js';
 import { tokenize } from './tokenizer.js';
 import { isCodeLanguage } from '../project/languages.js';
 
@@ -19,7 +20,7 @@ const K1 = 1.4;
 const B = 0.7;
 
 interface Doc {
-  chunkId: number;
+  chunkId: string;
   relPath: string;
   startLine: number;
   endLine: number;
@@ -44,9 +45,9 @@ export class SearchEngine {
   ) {}
 
   /** In-memory BM25 corpus built from the persisted chunk index. */
-  private buildCorpus(projectId: string, pathFilter?: string): Doc[] {
-    const files = this.db.projects.filesByPath(projectId);
-    const chunks = this.db.projects.chunks(projectId);
+  private async buildCorpus(projectId: string, pathFilter?: string): Promise<Doc[]> {
+    const files = await this.db.projects.filesByPath(projectId);
+    const chunks = await this.db.projects.chunks(projectId);
     const docs: Doc[] = [];
     for (const chunk of chunks) {
       if (pathFilter && !chunk.relPath.includes(pathFilter)) continue;
@@ -58,7 +59,7 @@ export class SearchEngine {
       const tf = new Map<string, number>();
       for (const t of terms) tf.set(t, (tf.get(t) ?? 0) + 1);
       docs.push({
-        chunkId: chunk.id,
+        chunkId: String(chunk.id),
         relPath: chunk.relPath,
         startLine: chunk.startLine,
         endLine: chunk.endLine,
@@ -74,7 +75,7 @@ export class SearchEngine {
   async search(options: SearchOptions): Promise<SearchResponse> {
     const startedAt = Date.now();
     const limit = options.limit ?? 12;
-    const corpus = this.buildCorpus(options.projectId, options.pathFilter);
+    const corpus = await this.buildCorpus(options.projectId, options.pathFilter);
     const queryTerms = tokenize(options.query);
 
     if (corpus.length === 0 || queryTerms.length === 0) {
@@ -160,10 +161,7 @@ export class SearchEngine {
     docs: { doc: Doc; score: number }[],
   ): Promise<{ doc: Doc; score: number }[] | null> {
     if (!this.router || docs.length === 0) return null;
-    const existing = this.db.db.all<{ chunk_id: number; vector: Uint8Array; dim: number }>(
-      'SELECT chunk_id, vector, dim FROM embeddings WHERE project_id = ?',
-      [projectId],
-    );
+    const existing = await this.db.embeddings.list(projectId);
     if (existing.length === 0) return null;
     let queryVector: number[];
     try {
@@ -174,14 +172,12 @@ export class SearchEngine {
     }
     if (queryVector.length === 0) return null;
 
-    const byChunk = new Map<number, number[]>();
-    for (const row of existing) {
-      byChunk.set(Number(row.chunk_id), decodeVector(row.vector, Number(row.dim)));
-    }
+    const byChunk = new Map<string, Float32Array>();
+    for (const row of existing) byChunk.set(row.chunkId, row.vector);
 
     const rescored = docs.map(({ doc, score }) => {
       const vector = byChunk.get(doc.chunkId);
-      const cos = vector ? cosine(queryVector, vector) : 0;
+      const cos = vector ? cosine(queryVector, Array.from(vector)) : 0;
       // Normalise BM25 into a comparable band before blending.
       const normalisedBm25 = score / (1 + score);
       return { doc, score: normalisedBm25 * 0.55 + cos * 0.45 };
@@ -193,12 +189,8 @@ export class SearchEngine {
   /** Persist embeddings for a project (used by the index command / job). */
   async embedProject(projectId: string, limit = 400): Promise<number> {
     if (!this.router) return 0;
-    const chunks = this.db.projects.chunks(projectId);
-    const already = new Set(
-      this.db.db
-        .all<{ chunk_id: number }>('SELECT chunk_id FROM embeddings WHERE project_id = ?', [projectId])
-        .map((r) => Number(r.chunk_id)),
-    );
+    const chunks = await this.db.projects.chunks(projectId);
+    const already = new Set((await this.db.embeddings.list(projectId)).map((row) => row.chunkId));
     const pending = chunks.filter((c) => !already.has(c.id)).slice(0, limit);
     if (pending.length === 0) return 0;
     let stored = 0;
@@ -206,20 +198,15 @@ export class SearchEngine {
     for (let i = 0; i < pending.length; i += batchSize) {
       const batch = pending.slice(i, i + batchSize);
       try {
-        const vectors = await this.router.embed(batch.map((c) => c.content.slice(0, 4000)), 'search.index');
-        this.db.db.transaction(() => {
-          for (const [index, chunk] of batch.entries()) {
-            const vector = vectors[index];
-            if (!vector || vector.length === 0) continue;
-            this.db.db.run(
-              `INSERT INTO embeddings (chunk_id, project_id, vector, dim, model, created_at)
-               VALUES (?, ?, ?, ?, ?, ?)
-               ON CONFLICT(chunk_id) DO UPDATE SET vector = excluded.vector, dim = excluded.dim`,
-              [chunk.id, projectId, new Uint8Array(new Float32Array(vector).buffer), vector.length, 'text-embedding-004', Date.now()],
-            );
-            stored += 1;
-          }
-        });
+        const vectors = await this.router.embed(
+          batch.map((c) => c.content.slice(0, 4000)),
+          'search.index',
+        );
+        const entries = batch
+          .map((chunk, index) => ({ chunkId: String(chunk.id), vector: new Float32Array(vectors[index] ?? []) }))
+          .filter((entry) => entry.vector.length > 0);
+        await this.db.embeddings.upsert(projectId, EMBEDDING_MODEL, entries);
+        stored += entries.length;
       } catch {
         return stored;
       }

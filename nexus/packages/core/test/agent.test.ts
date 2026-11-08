@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeProject } from './fixtures.js';
+import { makeProject, type TempProject } from './fixtures.js';
 import { createApp } from '../src/app.js';
 import { MockProvider } from './mocks.js';
 import { EventBus } from '../src/events/bus.js';
@@ -13,7 +13,7 @@ import { NexusError } from '../src/errors.js';
 
 /** Build the full composition root against a fixture project. */
 async function appFor(
-  project: ReturnType<typeof makeProject>,
+  project: TempProject,
   options: { script?: Record<string, string>; configured?: boolean } = {},
 ) {
   return createApp({
@@ -28,7 +28,7 @@ async function appFor(
 }
 
 test('agent runs a heuristic plan end-to-end and verifies each step', async () => {
-  const project = makeProject({
+  const project = await makeProject({
     'package.json': JSON.stringify({ name: 'ok-fixture', scripts: { build: 'node -e "process.exit(0)"' } }),
     'src/a.ts': 'export const a = 1;\n',
   });
@@ -45,7 +45,7 @@ test('agent runs a heuristic plan end-to-end and verifies each step', async () =
   assert.equal(result.verified, true, 'at least one step must be verified');
   assert.ok(result.toolCalls > 0);
   assert.ok(result.steps.every((s) => s.status === 'completed' || s.status === 'skipped'));
-  const task = project.db.tasks.get(result.taskId);
+  const task = await project.db.tasks.get(result.taskId);
   assert.equal(task?.status, 'completed');
   assert.equal(task?.progress, 1);
   project.cleanup();
@@ -53,7 +53,7 @@ test('agent runs a heuristic plan end-to-end and verifies each step', async () =
 
 test('agent fails honestly when the verification command exits non-zero', async () => {
   // A package.json whose "test" script exits 1 — the agent must not claim success.
-  const project = makeProject({
+  const project = await makeProject({
     'package.json': JSON.stringify({ name: 'fail-fixture', scripts: { test: 'node -e "process.exit(1)"' } }),
   });
   const app = await appFor(project);
@@ -62,17 +62,17 @@ test('agent fails honestly when the verification command exits non-zero', async 
 
   assert.equal(result.status, 'failed', 'a non-zero exit must never be reported as success');
   assert.match(result.answer, /exit code 1/i);
-  const task = project.db.tasks.get(result.taskId);
+  const task = await project.db.tasks.get(result.taskId);
   assert.equal(task?.status, 'failed');
   assert.ok(task?.error);
   project.cleanup();
 });
 
 test('tool call limit stops a runaway task', async () => {
-  const project = makeProject({});
+  const project = await makeProject({});
   const app = await appFor(project);
   const off = autoRespondToApprovals(app, 'approve');
-  app.settings.update({ agent: { maxToolCalls: 1 } });
+  await app.settings.update({ agent: { maxToolCalls: 1 } });
   const result = await app.runtime.run({
     projectId: project.projectId,
     message: 'Add authentication, refactor the database layer, write tests and run the build',
@@ -85,10 +85,10 @@ test('tool call limit stops a runaway task', async () => {
 });
 
 test('duration limit aborts a long task', async () => {
-  const project = makeProject({});
+  const project = await makeProject({});
   const app = await appFor(project);
   const off = autoRespondToApprovals(app, 'approve');
-  app.settings.update({ agent: { maxDurationMs: 5000 } });
+  await app.settings.update({ agent: { maxDurationMs: 5000 } });
   const result = await app.runtime.run({ projectId: project.projectId, message: 'Build the project' });
   assert.ok(['completed', 'failed'].includes(result.status));
   off();
@@ -96,7 +96,7 @@ test('duration limit aborts a long task', async () => {
 });
 
 test('a task that requires approval is never auto-approved silently', async () => {
-  const project = makeProject({ 'src/a.ts': 'a\n' });
+  const project = await makeProject({ 'src/a.ts': 'a\n' });
   const app = await appFor(project);
   // Directly exercise the approval gate: high risk + no human → denial on timeout.
   const promise = app.approvals.request({
@@ -111,13 +111,13 @@ test('a task that requires approval is never auto-approved silently', async () =
   const decision = await promise;
   assert.equal(decision.approved, false);
   assert.equal(decision.by, 'timeout');
-  const stored = app.db.observability.approvals();
+  const stored = await app.db.observability.approvals();
   assert.equal(stored[0]!.status, 'rejected');
   project.cleanup();
 });
 
 test('a rejected approval short-circuits tool execution', async () => {
-  const project = makeProject({});
+  const project = await makeProject({});
   const app = await appFor(project);
   const pending = app.approvals.request({
     taskId: null,
@@ -130,8 +130,8 @@ test('a rejected approval short-circuits tool execution', async () => {
   });
   // Resolve as rejected while the request is in flight.
   await new Promise((resolve) => setTimeout(resolve, 20));
-  const pendingRecord = app.db.observability.approvals({ status: 'pending' })[0]!;
-  app.approvals.resolve(pendingRecord.id, false, 'user');
+  const pendingRecord = (await app.db.observability.approvals({ status: 'pending' }))[0]!;
+  await app.approvals.resolve(pendingRecord.id, false, 'user');
   const decision = await pending;
   assert.equal(decision.approved, false);
   assert.equal(decision.by, 'user');
@@ -139,7 +139,7 @@ test('a rejected approval short-circuits tool execution', async () => {
 });
 
 test('a rejected approval denies the tool call and leaves the file untouched', async () => {
-  const project = makeProject({ 'src/a.ts': 'export const a = 1;\n' });
+  const project = await makeProject({ 'src/a.ts': 'export const a = 1;\n' });
   const app = await appFor(project);
   await app.indexer.index(project.projectId);
   autoRespondToApprovals(app, 'reject');
@@ -155,7 +155,7 @@ test('a rejected approval denies the tool call and leaves the file untouched', a
   assert.equal(outcome.denied, true);
   assert.equal(outcome.error?.code, 'APPROVAL_REJECTED');
 
-  const approvals = project.db.observability.approvals();
+  const approvals = await project.db.observability.approvals();
   assert.ok(approvals.length >= 1);
   assert.ok(approvals.some((a) => a.status === 'rejected'));
 
@@ -166,7 +166,7 @@ test('a rejected approval denies the tool call and leaves the file untouched', a
 });
 
 test('an approved edit is staged, applied and produces a rollback snapshot', async () => {
-  const project = makeProject({ 'src/a.ts': 'export const a = 1;\n' });
+  const project = await makeProject({ 'src/a.ts': 'export const a = 1;\n' });
   const app = await appFor(project);
   await app.indexer.index(project.projectId);
   autoRespondToApprovals(app, 'approve');
@@ -202,7 +202,7 @@ test('an approved edit is staged, applied and produces a rollback snapshot', asy
 });
 
 test('a role without write permission cannot edit files even with approval', async () => {
-  const project = makeProject({ 'src/a.ts': 'export const a = 1;\n' });
+  const project = await makeProject({ 'src/a.ts': 'export const a = 1;\n' });
   const app = await appFor(project);
   autoRespondToApprovals(app, 'approve');
   const outcome = await app.registry.execute(
@@ -216,7 +216,7 @@ test('a role without write permission cannot edit files even with approval', asy
   project.cleanup();
 });
 
-test('task state machine rejects illegal transitions', () => {
+test('task state machine rejects illegal transitions', async () => {
   assert.ok(canTransition('pending', 'planning'));
   assert.ok(!canTransition('completed', 'running'));
   assert.ok(!canTransition('cancelled', 'running'));
@@ -227,25 +227,25 @@ test('task state machine rejects illegal transitions', () => {
 });
 
 test('cancellation stops the task between steps', async () => {
-  const project = makeProject({});
+  const project = await makeProject({});
   const app = await appFor(project);
   const off = autoRespondToApprovals(app, 'approve');
-  const runPromise = app.runtime.run({
+  const runPromise = await app.runtime.run({
     projectId: project.projectId,
     message: 'Analyse the architecture, then build, then test, then start the dev server',
   });
   // Cancel as soon as a task row exists.
   await new Promise((resolve) => setTimeout(resolve, 30));
-  const active = project.db.tasks.list({ limit: 5 });
-  for (const task of active) app.runtime.cancel(task.id);
+  const active = await project.db.tasks.list({ limit: 5 });
+  for (const task of active) await app.runtime.cancel(task.id);
   const result = await runPromise;
   assert.ok(['cancelled', 'completed', 'failed'].includes(result.status));
   off();
   project.cleanup();
 });
 
-test('planner rejects unknown tools, cycles and over-budget steps', () => {
-  const db = makeProject({});
+test('planner rejects unknown tools, cycles and over-budget steps', async () => {
+  const db = await makeProject({});
   const app = new ToolRegistry(db.db.observability, {} as never, undefined);
   const planner = new TaskPlanner(app, null);
   const notes: string[] = [];
@@ -277,8 +277,8 @@ test('planner rejects unknown tools, cycles and over-budget steps', () => {
   db.cleanup();
 });
 
-test('planner honours role tool permissions', () => {
-  const project = makeProject({});
+test('planner honours role tool permissions', async () => {
+  const project = await makeProject({});
   const app = new ToolRegistry(project.db.observability, {} as never, undefined);
   const planner = new TaskPlanner(app, null);
   const notes: string[] = [];
@@ -295,25 +295,25 @@ test('planner honours role tool permissions', () => {
   project.cleanup();
 });
 
-test('orchestrator prevents two agents from writing the same file', () => {
-  const project = makeProject({});
+test('orchestrator prevents two agents from writing the same file', async () => {
+  const project = await makeProject({});
   const orchestrator = new AgentOrchestrator(project.db);
-  const first = orchestrator.delegate({ role: 'coding', taskId: 'task_1', projectId: project.projectId, files: ['src/a.ts'] });
+  const first = await orchestrator.delegate({ role: 'coding', taskId: 'task_1', projectId: project.projectId, files: ['src/a.ts'] });
   assert.ok(first.lease);
   assert.equal(first.conflicts.length, 0);
 
-  const second = orchestrator.delegate({ role: 'documentation', taskId: 'task_2', projectId: project.projectId, files: ['src/a.ts'] });
+  const second = await orchestrator.delegate({ role: 'documentation', taskId: 'task_2', projectId: project.projectId, files: ['src/a.ts'] });
   assert.equal(second.lease, null);
   assert.equal(second.conflicts.length, 1);
   assert.equal(second.conflicts[0]!.file, 'src/a.ts');
 
-  orchestrator.releaseTask('task_1');
-  const third = orchestrator.delegate({ role: 'documentation', taskId: 'task_2', projectId: project.projectId, files: ['src/a.ts'] });
+  await orchestrator.releaseTask('task_1');
+  const third = await orchestrator.delegate({ role: 'documentation', taskId: 'task_2', projectId: project.projectId, files: ['src/a.ts'] });
   assert.ok(third.lease);
   project.cleanup();
 });
 
-test('agent roles have coherent tool allow-lists', () => {
+test('agent roles have coherent tool allow-lists', async () => {
   const agents = AgentRoles.all();
   assert.equal(agents.length, 7);
   const analyst = agents.find((a) => a.role === 'analyst')!;
@@ -337,7 +337,7 @@ function autoRespondToApprovals(app: Awaited<ReturnType<typeof appFor>>, decisio
     // Resolve on the next tick so the gate has registered its pending resolver.
     setTimeout(() => {
       try {
-        app.approvals.resolve(approvalId, decision === 'approve', 'test-user');
+        void app.approvals.resolve(approvalId, decision === 'approve', 'test-user').catch(() => {});
       } catch {
         /* already resolved */
       }

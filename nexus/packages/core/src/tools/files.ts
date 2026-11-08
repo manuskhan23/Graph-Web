@@ -93,7 +93,7 @@ export function createFileTools(deps: FileToolDeps): ToolDefinition<unknown, unk
     allowedRoles: [],
     async execute(input, ctx) {
       requireProject(ctx.projectId);
-      const file = editor.readFile(ctx.projectId!, input.relPath);
+      const file = await editor.readFile(ctx.projectId!, input.relPath);
       const lines = file.content.split(/\r?\n/);
       const start = input.startLine ?? 1;
       const end = input.endLine ?? lines.length;
@@ -133,8 +133,7 @@ export function createFileTools(deps: FileToolDeps): ToolDefinition<unknown, unk
     async execute(input, ctx) {
       requireProject(ctx.projectId);
       const limit = input.limit ?? 200;
-      const files = db.projects
-        .files(ctx.projectId!)
+      const files = (await db.projects.files(ctx.projectId!))
         .filter((f) => !input.pathPrefix || f.relPath.startsWith(input.pathPrefix))
         .slice(0, limit);
       const listing = files.map((f) => `${f.relPath} (${f.language}, ${f.lines} lines)`).join('\n');
@@ -249,7 +248,7 @@ export function createFileTools(deps: FileToolDeps): ToolDefinition<unknown, unk
     allowedRoles: ['coding', 'debugging', 'testing', 'documentation'],
     async execute(input, ctx) {
       requireProject(ctx.projectId);
-      const staged = editor.stage(ctx.projectId!, input.operations as EditOperation[], input.label ?? 'Agent edit');
+      const staged = await editor.stage(ctx.projectId!, input.operations as EditOperation[], input.label ?? 'Agent edit');
       stagedEdits.set(staged.operationId, {
         operationId: staged.operationId,
         changeCount: staged.changes.length,
@@ -298,7 +297,7 @@ export function createFileTools(deps: FileToolDeps): ToolDefinition<unknown, unk
     allowedRoles: ['coding', 'debugging', 'testing', 'documentation'],
     async execute(input, ctx) {
       requireProject(ctx.projectId);
-      const result = editor.apply(input.operationId);
+      const result = await editor.apply(input.operationId);
       stagedEdits.delete(input.operationId);
       return {
         ok: true,
@@ -331,7 +330,7 @@ export function createFileTools(deps: FileToolDeps): ToolDefinition<unknown, unk
     allowedRoles: ['coding', 'debugging', 'testing', 'documentation'],
     async execute(input, ctx) {
       requireProject(ctx.projectId);
-      const result = snapshots.restore(input.snapshotId, input.relPaths);
+      const result = await snapshots.restore(input.snapshotId, input.relPaths);
       return {
         ok: true,
         summary: `Restored ${result.restored.length + result.created.length} file(s)`,

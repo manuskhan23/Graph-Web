@@ -27,12 +27,12 @@ export class ProjectIndexer {
   ) {}
 
   async index(projectId: string, options: IndexOptions = {}): Promise<ScanResult> {
-    const project = this.db.projects.get(projectId);
+    const project = await this.db.projects.get(projectId);
     if (!project) throw new NexusError('NOT_FOUND', `Project not found: ${projectId}`);
 
     const startedAt = Date.now();
     const entries = walkProject(project.rootPath, project.ignoredGlobs, { maxFiles: options.maxFiles });
-    const existing = options.force ? new Map() : this.db.projects.filesByPath(projectId);
+    const existing = options.force ? new Map() : await this.db.projects.filesByPath(projectId);
     const seen = new Set<string>();
 
     let added = 0;
@@ -40,7 +40,7 @@ export class ProjectIndexer {
     let unchanged = 0;
     let skipped = 0;
     const indexVersion = project.indexVersion + 1;
-    const runId = this.db.projects.startIndexRun(projectId, indexVersion);
+    const runId = await this.db.projects.startIndexRun(projectId, indexVersion);
 
     try {
       for (const entry of entries) {
@@ -60,7 +60,7 @@ export class ProjectIndexer {
           continue;
         }
 
-        this.db.projects.upsertFile(projectId, {
+        await this.db.projects.upsertFile(projectId, {
           relPath: entry.relPath,
           language: entry.language,
           size: entry.size,
@@ -75,7 +75,7 @@ export class ProjectIndexer {
           tokens: tokenize(`${entry.relPath} ${chunk.content}`).join(' '),
           hash: hashContent(chunk.content),
         }));
-        this.db.projects.replaceChunks(projectId, entry.relPath, chunks);
+        await this.db.projects.replaceChunks(projectId, entry.relPath, chunks);
 
         if (prior) modified += 1;
         else added += 1;
@@ -86,16 +86,16 @@ export class ProjectIndexer {
       let removed = 0;
       for (const relPath of existing.keys()) {
         if (!seen.has(relPath)) {
-          this.db.projects.deleteFile(projectId, relPath);
+          await this.db.projects.deleteFile(projectId, relPath);
           removed += 1;
         }
       }
 
-      this.db.projects.update(projectId, {
+      await this.db.projects.update(projectId, {
         indexVersion,
         lastIndexedAt: Date.now(),
       });
-      this.db.projects.finishIndexRun(runId, {
+      await this.db.projects.finishIndexRun(runId, {
         scanned: entries.length,
         added,
         modified,
@@ -117,7 +117,7 @@ export class ProjectIndexer {
         indexVersion,
       };
 
-      this.db.observability.addActivity({
+      await this.db.observability.addActivity({
         kind: 'system',
         level: 'info',
         title: `Indexed ${project.name}`,
@@ -130,7 +130,7 @@ export class ProjectIndexer {
 
       return result;
     } catch (err) {
-      this.db.projects.finishIndexRun(runId, {
+      await this.db.projects.finishIndexRun(runId, {
         scanned: entries.length,
         added,
         modified,

@@ -26,10 +26,12 @@ export function projectsRoutes(app: NexusApp): Router {
   router.get(
     '/',
     asyncRoute(async (_req, res) => {
-      const projects = app.db.projects.list().map((project) => ({
-        ...project,
-        fileCount: app.db.projects.countFiles(project.id),
-      }));
+      const projects = await Promise.all(
+        (await app.db.projects.list()).map(async (project) => ({
+          ...project,
+          fileCount: await app.db.projects.countFiles(project.id),
+        })),
+      );
       res.json({ projects });
     }),
   );
@@ -39,12 +41,12 @@ export function projectsRoutes(app: NexusApp): Router {
     asyncRoute(async (req, res) => {
       const body = parseBody(createSchema, req.body);
       const rootPath = assertProjectRoot(body.rootPath);
-      const existing = app.db.projects.findByRoot(rootPath);
+      const existing = await app.db.projects.findByRoot(rootPath);
       if (existing) {
         throw new NexusError('CONFLICT', `This directory is already registered as "${existing.name}"`);
       }
       const name = body.name ?? rootPath.split(/[\\/]/).filter(Boolean).pop() ?? 'Project';
-      const project = app.db.projects.create({
+      const project = await app.db.projects.create({
         name,
         rootPath,
         description: body.description,
@@ -59,7 +61,7 @@ export function projectsRoutes(app: NexusApp): Router {
         return result;
       }, { referenceId: project.id });
 
-      app.db.observability.addActivity({
+      await app.db.observability.addActivity({
         kind: 'system',
         level: 'info',
         title: 'Project registered',
@@ -77,11 +79,11 @@ export function projectsRoutes(app: NexusApp): Router {
   router.get(
     '/:projectId',
     asyncRoute(async (req, res) => {
-      const project = app.db.projects.get(requireParam(req, 'projectId'));
+      const project = await app.db.projects.get(requireParam(req, 'projectId'));
       if (!project) throw new NexusError('NOT_FOUND', 'Project not found');
       res.json({
-        project: { ...project, fileCount: app.db.projects.countFiles(project.id) },
-        indexRuns: app.db.projects.recentIndexRuns(project.id, 5),
+        project: { ...project, fileCount: await app.db.projects.countFiles(project.id) },
+        indexRuns: await app.db.projects.recentIndexRuns(project.id, 5),
       });
     }),
   );
@@ -91,7 +93,7 @@ export function projectsRoutes(app: NexusApp): Router {
     asyncRoute(async (req, res) => {
       const projectId = requireParam(req, 'projectId');
       const patch = parseBody(updateSchema, req.body);
-      const updated = app.db.projects.update(projectId, patch);
+      const updated = await app.db.projects.update(projectId, patch);
       if (!updated) throw new NexusError('NOT_FOUND', 'Project not found');
       app.context.invalidate(projectId);
       res.json({ project: updated });
@@ -102,12 +104,12 @@ export function projectsRoutes(app: NexusApp): Router {
     '/:projectId',
     asyncRoute(async (req, res) => {
       const projectId = requireParam(req, 'projectId');
-      const project = app.db.projects.get(projectId);
+      const project = await app.db.projects.get(projectId);
       if (!project) throw new NexusError('NOT_FOUND', 'Project not found');
       // Snapshots and blob files are cleaned before the cascade delete.
-      app.snapshots.purgeProject(projectId);
+      await app.snapshots.purgeProject(projectId);
       app.orchestrator.releaseTask(projectId);
-      app.db.projects.remove(projectId);
+      await app.db.projects.remove(projectId);
       app.context.invalidate(projectId);
       res.json({ removed: true, projectId });
     }),
@@ -119,7 +121,7 @@ export function projectsRoutes(app: NexusApp): Router {
     asyncRoute(async (req, res) => {
       const projectId = requireParam(req, 'projectId');
       const force = Boolean((req.body as { force?: boolean })?.force);
-      const project = app.db.projects.get(projectId);
+      const project = await app.db.projects.get(projectId);
       if (!project) throw new NexusError('NOT_FOUND', 'Project not found');
       const job = app.jobs.start('index', async ({ report }) => {
         report(0.2, 'Scanning');
@@ -137,7 +139,7 @@ export function projectsRoutes(app: NexusApp): Router {
     asyncRoute(async (req, res) => {
       const projectId = requireParam(req, 'projectId');
       try {
-        res.json({ analysis: app.analyzer.analyze(projectId) });
+        res.json({ analysis: await app.analyzer.analyze(projectId) });
       } catch (err) {
         sendError(res, err);
       }
@@ -147,7 +149,7 @@ export function projectsRoutes(app: NexusApp): Router {
   router.get(
     '/:projectId/tree',
     asyncRoute(async (req, res) => {
-      res.json(app.editor.listTree(requireParam(req, 'projectId')));
+      res.json(await app.editor.listTree(requireParam(req, 'projectId')));
     }),
   );
 
@@ -155,7 +157,7 @@ export function projectsRoutes(app: NexusApp): Router {
     '/:projectId/files',
     asyncRoute(async (req, res) => {
       const projectId = requireParam(req, 'projectId');
-      const files = app.db.projects.files(projectId);
+      const files = await app.db.projects.files(projectId);
       res.json({ files, total: files.length });
     }),
   );
@@ -166,7 +168,7 @@ export function projectsRoutes(app: NexusApp): Router {
       const projectId = requireParam(req, 'projectId');
       const relPath = String(req.query.path ?? '');
       if (!relPath) throw new NexusError('VALIDATION_FAILED', 'query param "path" is required');
-      res.json(app.editor.readFile(projectId, relPath));
+      res.json(await app.editor.readFile(projectId, relPath));
     }),
   );
 

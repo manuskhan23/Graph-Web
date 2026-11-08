@@ -23,7 +23,7 @@ React 19 + TS renderer (13 surfaces, strict monochrome)
 
 | Layer | Path | Contents |
 | --- | --- | --- |
-| Core | `packages/core/src` | types, errors, config, storage (SQLite, 22 tables, migrations v1/v2), security, providers, project/indexing, context, search, snapshots, editor, terminal, tools, agents, agent runtime, browser, vision, tasks, workflows, jobs, memory, `app.ts` |
+| Core | `packages/core/src` | types, errors, config, storage (**dual backend: SQLite or MongoDB**), security, providers, project/indexing, context, search, snapshots, editor, terminal, tools, agents, agent runtime, browser, vision, tasks, workflows, jobs, memory, `app.ts` |
 | Server | `packages/server/src` | `buildServer`, route modules (`projects`, `agent`, `platform`), SSE stream, CSP + origin allow-list, static UI |
 | Desktop | `packages/desktop` | hardened `main.ts`, `preload.ts` (11 channels), `safeStorage` key vault, backend supervision |
 | UI | `ui/src` | `App.tsx` shell, 13 pages, shared components, typed API client, monochrome design system |
@@ -36,10 +36,40 @@ sent; model IDs are configurable; a fallback is attempted only when capability, 
 `allowCrossProviderFallback` policy all permit it. Missing key ⇒ `PROVIDER_NOT_CONFIGURED`, never a
 silent substitution.
 
-| Need | Provider | Default model |
-| --- | --- | --- |
-| Planning, reasoning, vision | Gemini | `gemini-2.5-pro` (vision forced to `gemini-2.5-flash`) |
-| Low-latency, high-volume | Groq | `openai/gpt-oss-120b` |
+### Model versions in this build
+
+Every ID below was checked against the providers' own documentation on **2026-11-08**
+(`ai.google.dev/gemini-api/docs/models`, `console.groq.com/docs/deprecations`). IDs live in
+`packages/core/src/providers/models.ts` and `GET /api/models` reports the same table the router uses.
+
+**Google Gemini**
+
+| Role | Model ID | Context | Notes |
+| --- | --- | --- | --- |
+| Default (planning, reasoning, tools) | `gemini-3.8-flash` | 1,048,576 | Also the vision model |
+| Vision | `gemini-3.8-flash` | 1,048,576 | `VISION_MODEL` constant |
+| Previous generation | `gemini-3.6-flash` | 1,048,576 | Retained for comparison |
+| High reasoning (preview) | `gemini-3.1-pro-preview` | 1,048,576 | Preview — may change without notice |
+| Embeddings | `gemini-embedding-001` | 2,048 | `EMBEDDING_MODEL`; drives semantic search |
+| Embeddings (multimodal) | `gemini-embedding-2` | 8,192 | Selectable, not the default |
+
+**Groq**
+
+| Role | Model ID | Context | Notes |
+| --- | --- | --- | --- |
+| Default (low-latency) | `openai/gpt-oss-120b` | 131,072 | Falls back here only when policy allows |
+| Cheaper/smaller | `openai/gpt-oss-20b` | 131,072 | ~1000 tok/s class |
+| Alternative | `qwen/qwen3.6-27b` | 131,072 | No list price captured |
+| Speech-to-text | `whisper-large-v3-turbo` | — | Audio only, no text generation |
+
+**IDs deliberately not shipped** — they are retired and would 404 at runtime:
+`gemini-2.5-pro` / `gemini-2.5-flash` (auto-route away on 2026-12-01),
+`gemini-2.0-flash` and `gemini-3-pro-preview` (shut down), `text-embedding-004` (superseded),
+`llama-3.3-70b-versatile` (shut down 2026-08-16).
+
+Model IDs drift faster than application code. `GET /api/models` is the single source of truth for what
+this build will actually request; the router rejects an unknown or incapable model **before** sending a
+request instead of failing mid-task.
 
 ## Quick start
 
@@ -55,7 +85,10 @@ Environment:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `NEXUS_PORT` | `4400` | HTTP port |
-| `NEXUS_DATA_DIR` | `~/.nexus-ai` | SQLite database, snapshots, secrets file |
+| `NEXUS_DATA_DIR` | `~/.nexus-ai` | SQLite database, artifacts, secrets file |
+| `MONGODB_URI` | — | Switches storage to MongoDB (see below) |
+| `MONGODB_DB` | `nexus` | MongoDB database name |
+| `MONGODB_COLLECTION_PREFIX` | `nexus_` | Prefix applied to every collection |
 | `NEXUS_SEED_DEMO=1` | off | Register + index this repository as a demo project |
 | `GEMINI_API_KEY` | — | Enables Gemini |
 | `GROQ_API_KEY` | — | Enables Groq |
@@ -63,6 +96,46 @@ Environment:
 No key at all? The app still runs: projects, indexing, search, terminal, memory, snapshots, workflows,
 analytics and the UI all work; planning falls back to the deterministic heuristic planner and says so in
 the answer.
+
+## Storage backends
+
+Storage is chosen at startup from one variable and exposed as async store interfaces
+(`packages/core/src/storage/contracts.ts`), so nothing above the storage layer knows which
+backend is live. `GET /api/health` reports it: `{ database: { backend, location, version, serverVersion } }`.
+
+| Backend | Selected when | Notes |
+| --- | --- | --- |
+| **SQLite** (default) | `MONGODB_URI` unset | `node:sqlite`, WAL, schema v2, 23 tables, migrations |
+| **MongoDB** | `MONGODB_URI` set | 8 collections + indexes, schema v2, cascades written by hand |
+
+```bash
+MONGODB_URI='mongodb+srv://user:pass@cluster.example.net/nexus' npm start
+```
+
+MongoDB design notes:
+
+- `_id` is the application id string (`prj_…`, `tsk_…`) so ids are identical on both backends.
+- Documents are camelCase with epoch-millisecond numbers — no `Date` objects on the wire.
+- Uniqueness (`projects.root_path`) becomes a unique index, created idempotently on connect.
+- There are no foreign keys: `ProjectStore.remove` and `SnapshotStore` cascades are explicit
+  multi-collection deletes.
+- `projectId: null` matches global rows, mirroring the SQL `(projectId = ? OR projectId IS NULL)`.
+- The URI is never logged or returned; `/api/health` shows a redacted form (`mongodb://user:***@host/db`).
+
+**Verification status — stated plainly.** The MongoDB backend compiles, its 85 contract methods are
+present on all 8 stores, and a failed connection produces a single actionable `STORAGE_ERROR`. But
+this environment has **no `mongod` and no Docker**, so the Mongo happy path — connect, index creation,
+every read/write, and the cascades — has **never been executed against a real server**. It is
+**unverified**, not "working". SQLite is the backend that the 82 tests and the 54-check HTTP suite
+actually run against. Treat MongoDB as reviewable code that needs a live cluster before you rely on it.
+
+Setting an unreachable `MONGODB_URI` fails loudly at startup rather than silently falling back to
+SQLite:
+
+```
+NexusError [STORAGE_ERROR]: Cannot reach MongoDB at mongodb://… .
+Check MONGODB_URI, the server status and any IP allow-list.
+```
 
 ## Desktop shell
 

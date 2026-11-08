@@ -15,7 +15,7 @@ import {
 } from '../src/security/index.js';
 import { NexusError } from '../src/errors.js';
 
-test('path guard rejects traversal and absolute escapes', () => {
+test('path guard rejects traversal and absolute escapes', async () => {
   const root = mkdtempSync(join(tmpdir(), 'nexus-path-'));
   mkdirSync(join(root, 'src'));
   writeFileSync(join(root, 'src', 'a.ts'), 'x');
@@ -34,7 +34,7 @@ test('path guard rejects traversal and absolute escapes', () => {
   rmSync(root, { recursive: true, force: true });
 });
 
-test('path guard follows symlinks and rejects ones that escape', () => {
+test('path guard follows symlinks and rejects ones that escape', async () => {
   const root = mkdtempSync(join(tmpdir(), 'nexus-sym-'));
   const outside = mkdtempSync(join(tmpdir(), 'nexus-out-'));
   writeFileSync(join(outside, 'secret.txt'), 'nope');
@@ -56,7 +56,7 @@ function resolveInsideProjectRealSafe(root: string, relPath: string): string {
   return mod.resolveInsideProjectReal(root, relPath);
 }
 
-test('secret and binary path detection', () => {
+test('secret and binary path detection', async () => {
   assert.ok(isSecretPath('.env'));
   assert.ok(isSecretPath('config/.env.production'));
   assert.ok(isSecretPath('certs/server.pem'));
@@ -70,7 +70,7 @@ test('secret and binary path detection', () => {
   assert.ok(!isBinaryPath('main.ts'));
 });
 
-test('command policy blocks destructive commands outright', () => {
+test('command policy blocks destructive commands outright', async () => {
   const blocked = [
     'rm -rf /',
     'mkfs.ext4 /dev/sda1',
@@ -96,7 +96,7 @@ test('command policy blocks destructive commands outright', () => {
   assert.throws(() => assertCommandAllowed('   '), (err: unknown) => err instanceof NexusError);
 });
 
-test('commands needing human approval are flagged', () => {
+test('commands needing human approval are flagged', async () => {
   assert.ok(commandNeedsApproval('rm -r dist'));
   assert.ok(commandNeedsApproval('npm uninstall express'));
   assert.ok(commandNeedsApproval('git push origin main'));
@@ -105,7 +105,7 @@ test('commands needing human approval are flagged', () => {
   assert.ok(!commandNeedsApproval('git status'));
 });
 
-test('secret value detection for memory/log guards', () => {
+test('secret value detection for memory/log guards', async () => {
   assert.ok(containsSecretValue('key is AIzaSyBO0TVbpLYjrM688KqfxEGkhHSPHFsetd8'));
   assert.ok(containsSecretValue('gsk_abcdefghijklmnopqrstuvwxyz123456'));
   assert.ok(containsSecretValue('password: hunter2hunter2'));
@@ -113,7 +113,7 @@ test('secret value detection for memory/log guards', () => {
   assert.ok(!containsSecretValue('The build uses Vite and React.'));
 });
 
-test('git metadata is protected from edits', () => {
+test('git metadata is protected from edits', async () => {
   assert.throws(() => assertNoGitMetadata('.git/config'), (err: unknown) => err instanceof NexusError);
   assert.throws(() => assertNoGitMetadata('sub/.git/HEAD'), (err: unknown) => err instanceof NexusError);
   assert.doesNotThrow(() => assertNoGitMetadata('src/gitignore.ts'));

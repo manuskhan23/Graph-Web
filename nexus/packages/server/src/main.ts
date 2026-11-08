@@ -6,7 +6,8 @@
  * Env:
  *   NEXUS_PORT                (default 4400)
  *   NEXUS_DATA_DIR            (default ~/.nexus-ai)
- *   NEXUS_SEED_DEMO=1         register + index this repository as a demo project
+ *   NEXUS_SEED_DEMO=1         register + index a demo project on first start
+ *   NEXUS_DEMO_ROOT           directory to seed (default: parent repo, else this repo)
  *   GEMINI_API_KEY / GROQ_API_KEY
  */
 import { resolve } from 'node:path';
@@ -52,14 +53,27 @@ async function main(): Promise<void> {
 }
 
 async function seedDemo(nexus: Awaited<ReturnType<typeof buildServer>>['nexus']): Promise<void> {
-  const candidate = resolve(process.cwd(), '..');
-  if (!existsSync(candidate)) return;
+  // Register a project so the UI has something real to show. `NEXUS_DEMO_ROOT`
+  // wins; otherwise fall back to the parent directory (the previous layout) and
+  // finally to this repository itself, so the seeder works standalone.
+  const explicit = process.env.NEXUS_DEMO_ROOT;
+  const parent = resolve(process.cwd(), '..');
+  const self = resolve(process.cwd());
+  const candidate = explicit
+    ? resolve(explicit)
+    : existsSync(parent) && existsSync(resolve(parent, '.git'))
+      ? parent
+      : self;
+  if (!existsSync(candidate)) {
+    console.warn(`  ⚠ Demo seeding skipped: ${candidate} does not exist`);
+    return;
+  }
   const existing = await nexus.db.projects.findByRoot(candidate);
   if (existing) return;
   const project = await nexus.db.projects.create({
-    name: 'Graph-Web',
+    name: candidate.split(/[\\/]/).filter(Boolean).pop() ?? 'Demo',
     rootPath: candidate,
-    description: 'Seeded demo project (MyGraph web app)',
+    description: 'Seeded demo project',
   });
   const result = await nexus.indexer.index(project.id);
   console.log(`  Seeded demo project: ${result.scanned} files indexed (v${result.indexVersion})`);

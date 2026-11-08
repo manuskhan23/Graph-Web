@@ -89,7 +89,8 @@ Environment:
 | `MONGODB_URI` | — | Switches storage to MongoDB (see below) |
 | `MONGODB_DB` | `nexus` | MongoDB database name |
 | `MONGODB_COLLECTION_PREFIX` | `nexus_` | Prefix applied to every collection |
-| `NEXUS_SEED_DEMO=1` | off | Register + index this repository as a demo project |
+| `NEXUS_SEED_DEMO=1` | off | Register + index a demo project on first start |
+| `NEXUS_DEMO_ROOT` | parent repo, else this repo | Directory to seed when `NEXUS_SEED_DEMO=1` |
 | `GEMINI_API_KEY` | — | Enables Gemini |
 | `GROQ_API_KEY` | — | Enables Groq |
 
@@ -183,9 +184,9 @@ npm run typecheck      # server + desktop + ui, all clean
 ```
 
 The full per-feature verdict — including what is partial, mocked, deliberately absent, or blocked by
-this sandbox — is in **[`docs/nexus/COMPLETION_MATRIX.md`](../../docs/nexus/COMPLETION_MATRIX.md)**.
-The audit that preceded the build is in [`docs/nexus/AUDIT.md`](../../docs/nexus/AUDIT.md), and the
-dependency-ordered plan in [`docs/nexus/ROADMAP.md`](../../docs/nexus/ROADMAP.md).
+this sandbox — is in **[`docs/COMPLETION_MATRIX.md`](docs/COMPLETION_MATRIX.md)**.
+The audit that preceded the build is in [`docs/AUDIT.md`](docs/AUDIT.md), and the
+dependency-ordered plan in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 Metrics shown in the product are SQL aggregates over real rows. Where a number cannot be known it
 renders as `—` with the reason attached; nothing is fabricated.
